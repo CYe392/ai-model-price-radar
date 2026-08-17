@@ -36,3 +36,17 @@ export const collectionRuns = sqliteTable("collection_runs", {
   updateCount: integer("update_count").notNull(),
   rejectedCount: integer("rejected_count").notNull().default(0),
 });
+
+export const sourceChecks = sqliteTable("source_checks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  checkedAt: text("checked_at").notNull(),
+  sourceId: text("source_id").notNull(),
+  sourceName: text("source_name").notNull(),
+  url: text("url").notNull(),
+  status: text("status").notNull(),
+  detail: text("detail").notNull(),
+  records: integer("records").notNull().default(0),
+}, (table) => [
+  index("idx_source_checks_source_time").on(table.sourceId, table.checkedAt),
+  index("idx_source_checks_checked_at").on(table.checkedAt),
+]);

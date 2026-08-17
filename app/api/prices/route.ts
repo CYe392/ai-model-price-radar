@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { collectionRuns, priceSnapshots } from "../../../db/schema";
+import { collectionRuns, priceSnapshots, sourceChecks } from "../../../db/schema";
 
 type SourceStatus = { id: string; name: string; url: string; status: "ok" | "changed" | "blocked" | "error"; detail: string; checkedAt: string; records: number };
 type PriceUpdate = { model: string; provider: string; input?: number; cached?: number; write?: number; output?: number; source: string; currency?: string; nativeInput?: number; nativeOutput?: number; listInput?: number; listOutput?: number; discountPercent?: number; pricingRegion?: string; fxRate?: number; fxAsOf?: string; tier?: string };
@@ -160,7 +160,7 @@ function maxChange(previous: { input:number|null; cached:number|null; cacheWrite
   return pairs.reduce((max,[before,after]) => before && after != null ? Math.max(max,Math.abs((after-before)/before)*100) : max,0);
 }
 
-async function persist(updates: PriceUpdate[], sourceCount: number, okCount: number, collectedAt: string) {
+async function persist(updates: PriceUpdate[], sources: SourceStatus[], collectedAt: string) {
   const db = getDb();
   const accepted: PriceUpdate[] = [];
   const changes: PriceChange[] = [];
@@ -178,7 +178,8 @@ async function persist(updates: PriceUpdate[], sourceCount: number, okCount: num
       }
     } else rejected++;
   }
-  await db.insert(collectionRuns).values({ collectedAt,sourceCount,okCount,updateCount:accepted.length,rejectedCount:rejected });
+  await db.insert(collectionRuns).values({ collectedAt,sourceCount:sources.length,okCount:sources.filter(s=>s.status==="ok").length,updateCount:accepted.length,rejectedCount:rejected });
+  if(sources.length)await db.insert(sourceChecks).values(sources.map(s=>({checkedAt:collectedAt,sourceId:s.id,sourceName:s.name,url:s.url,status:s.status,detail:s.detail,records:s.records})));
   return { accepted,rejected,changes };
 }
 
@@ -196,7 +197,7 @@ export async function GET() {
   const collectedAt = new Date().toISOString();
   const parsed = results.flatMap(r=>r.updates);
   let updates = parsed, rejected = 0, persistence = "ok", changes:PriceChange[] = [];
-  try { const saved = await persist(parsed,results.length,results.filter(r=>r.source.status==="ok").length,collectedAt); updates=saved.accepted; rejected=saved.rejected; changes=saved.changes; }
+  try { const saved = await persist(parsed,results.map(r=>r.source),collectedAt); updates=saved.accepted; rejected=saved.rejected; changes=saved.changes; }
   catch (error) { persistence = error instanceof Error ? error.message : "snapshot storage failed"; }
   return Response.json({ collectedAt, sources: results.map(r=>r.source), updates, changes, rejected, persistence, policy: "public-pages-only; no authentication; no anti-bot bypass; >50% route changes quarantined" }, { headers: { "cache-control": "no-store" } });
 }

@@ -1312,7 +1312,11 @@ function CostCalculator({
   const [inputTokens, setInputTokens] = useState(100_000_000),
     [outputTokens, setOutputTokens] = useState(20_000_000),
     [hitRate, setHitRate] = useState(40),
-    [writeRate, setWriteRate] = useState(5);
+    [writeRate, setWriteRate] = useState(5),
+    [pricingMode, setPricingMode] = useState("standard"),
+    [taxRate, setTaxRate] = useState(0),
+    [freeCredits, setFreeCredits] = useState(0),
+    [extraMonthlyFee, setExtraMonthlyFee] = useState(0);
   const available = (p: P) =>
     region === "全球"
       ? p.regions.includes("全球") || p.regions.length > 1
@@ -1320,14 +1324,27 @@ function CostCalculator({
   const inputM = Math.max(0, inputTokens) / 1e6,
     outputM = Math.max(0, outputTokens) / 1e6,
     hit = Math.min(100, Math.max(0, hitRate)) / 100,
-    write = Math.min(100, Math.max(0, writeRate)) / 100;
+    write = Math.min(100, Math.max(0, writeRate)) / 100,
+    modeMultiplier =
+      pricingMode === "batch"
+        ? 0.5
+        : pricingMode === "priority"
+          ? 1.5
+          : pricingMode === "flex"
+            ? 0.5
+            : 1;
   const ranked = models
     .flatMap((m) =>
       m.providers.filter(available).map((p) => {
-        const standard = inputM * (1 - hit) * p.input,
-          cached = inputM * hit * (p.cached ?? p.input),
-          cacheWrite = inputM * write * (p.write ?? 0),
-          output = outputM * p.output;
+        const standard = inputM * (1 - hit) * p.input * modeMultiplier,
+          cached = inputM * hit * (p.cached ?? p.input) * modeMultiplier,
+          cacheWrite = inputM * write * (p.write ?? 0) * modeMultiplier,
+          output = outputM * p.output * modeMultiplier,
+          planFee = Number(p.plan?.match(/\$([0-9.]+)/)?.[1] ?? 0),
+          subtotal = standard + cached + cacheWrite + output + planFee + Math.max(0, extraMonthlyFee),
+          afterCredits = Math.max(0, subtotal - Math.max(0, freeCredits)),
+          tax = afterCredits * (Math.max(0, taxRate) / 100),
+          total = afterCredits + tax;
         return {
           m,
           p,
@@ -1335,12 +1352,41 @@ function CostCalculator({
           cached,
           cacheWrite,
           output,
-          total: standard + cached + cacheWrite + output,
+          planFee,
+          subtotal,
+          tax,
+          total,
         };
       }),
     )
     .sort((a, b) => a.total - b.total);
   const best = ranked[0]?.total || 0;
+  const sensitivity = [0, 25, 50, 75, 90].map((rate) => {
+    const route = ranked[0];
+    if (!route) return { rate, total: 0 };
+    const ratio = rate / 100;
+    const tokenCost =
+      inputM * (1 - ratio) * route.p.input * modeMultiplier +
+      inputM * ratio * (route.p.cached ?? route.p.input) * modeMultiplier +
+      inputM * write * (route.p.write ?? 0) * modeMultiplier +
+      outputM * route.p.output * modeMultiplier;
+    const subtotal = tokenCost + route.planFee + Math.max(0, extraMonthlyFee);
+    const afterCredits = Math.max(0, subtotal - Math.max(0, freeCredits));
+    return { rate, total: afterCredits * (1 + Math.max(0, taxRate) / 100) };
+  });
+  function exportEstimate() {
+    const header = "model,provider,standard_input,cache_read,cache_write,output,fixed_fees,tax,monthly_total";
+    const rows = ranked.map((r) =>
+      [r.m.name, providerLabel(r.p.name), r.standard, r.cached, r.cacheWrite, r.output, r.planFee + Math.max(0, extraMonthlyFee), r.tax, r.total]
+        .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+        .join(","),
+    );
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([[header, ...rows].join("\n")], { type: "text/csv" }));
+    link.download = "modelscope-cost-estimate.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
   return (
     <div className="calculator">
       <Title
@@ -1398,6 +1444,31 @@ function CostCalculator({
           options={regionOptions.map((r) => `${r}|${regionLabel(r)}`)}
         />
       </div>
+      <div className="calcInputs advanced">
+        <label>
+          Pricing mode
+          <select value={pricingMode} onChange={(e) => setPricingMode(e.target.value)}>
+            <option value="standard">Standard · published price</option>
+            <option value="batch">Batch · assume 50% discount</option>
+            <option value="flex">Flex · assume 50% discount</option>
+            <option value="priority">Priority · assume 50% premium</option>
+          </select>
+        </label>
+        <label>
+          Free monthly credits
+          <input type="number" min="0" step="1" value={freeCredits} onChange={(e) => setFreeCredits(+e.target.value)} />
+        </label>
+        <label>
+          Additional fixed fees
+          <input type="number" min="0" step="1" value={extraMonthlyFee} onChange={(e) => setExtraMonthlyFee(+e.target.value)} />
+        </label>
+        <label>
+          Estimated tax
+          <input type="number" min="0" max="100" step="0.1" value={taxRate} onChange={(e) => setTaxRate(+e.target.value)} />
+          <b>{taxRate}%</b>
+        </label>
+        <button className="exportCost" onClick={exportEstimate}>Export CSV</button>
+      </div>
       <div className="calcSummary">
         <div>
           <small>WORKLOAD</small>
@@ -1414,10 +1485,24 @@ function CostCalculator({
           </span>
         </div>
         <p>
-          Estimates exclude taxes, data transfer, minimum commitments,
-          subscription fees, and provider-specific rounding. Cache-write cost is
-          included only where the provider publishes it.
+          Includes published token rates, cache economics, detected subscription
+          fees, credits, optional fixed fees, and estimated tax. Data transfer,
+          minimum commitments, storage, and provider rounding remain excluded.
         </p>
+      </div>
+      <div className="costSensitivity">
+        <div>
+          <b>CACHE SENSITIVITY</b>
+          <h3>How cache hits change the best route</h3>
+          <p>Monthly total for {ranked[0]?.m.name ?? "the selected route"}, with every other assumption held constant.</p>
+        </div>
+        {sensitivity.map((point) => (
+          <span key={point.rate}>
+            <small>{point.rate}% hit</small>
+            <strong>${point.total.toFixed(2)}</strong>
+            <i style={{ height: `${Math.max(8, best ? (point.total / Math.max(...sensitivity.map((x) => x.total), 1)) * 58 : 8)}px` }} />
+          </span>
+        ))}
       </div>
       <div className="calcTable">
         <div className="calcHead">
@@ -1434,6 +1519,7 @@ function CostCalculator({
               <b>{r.m.name}</b>
               <small>
                 {providerLabel(r.p.name)} · {regionLabel(region)}
+                {r.planFee > 0 && ` · $${r.planFee}/mo plan`}
               </small>
             </span>
             <code>${r.standard.toFixed(2)}</code>

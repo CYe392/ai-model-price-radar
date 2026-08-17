@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 — Complete Cost Engine
+
+- Added Standard, Batch, Flex, and Priority pricing assumptions with explicit multipliers.
+- Added free credits, detected subscription fees, additional fixed fees, and estimated tax.
+- Added cache-hit sensitivity analysis across five workload profiles.
+- Added auditable CSV export with a full monthly cost breakdown.
+- Updated calculator disclosures for excluded transfer, storage, commitments, and rounding.
+
 ## 1.1.0 — Data Trust and Traceability
 
 - Added route-level verification labels for current, retained, and reference pricing.

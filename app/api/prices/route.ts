@@ -6,6 +6,7 @@ import { collectionRuns, priceSnapshots } from "../../../db/schema";
 type SourceStatus = { id: string; name: string; url: string; status: "ok" | "changed" | "blocked" | "error"; detail: string; checkedAt: string; records: number };
 type PriceUpdate = { model: string; provider: string; input?: number; cached?: number; write?: number; output?: number; source: string };
 type AdapterResult = { source: SourceStatus; updates: PriceUpdate[] };
+type PriceChange = { model:string;provider:string;field:string;before:number;after:number;percent:number;direction:"up"|"down" };
 
 const TARGETS = [
   { match: ["deepseek-v3.2", "deepseek/v3.2"], model: "DeepSeek V3.2" },
@@ -73,6 +74,53 @@ async function publicPage(id: string, name: string, url: string, signatures: str
   } catch (error) { return { source: status(id,name,url,"error",error instanceof Error ? error.message : "抓取失败"), updates: [] }; }
 }
 
+async function pricedPage(id:string,name:string,url:string,signatures:string[],extract:(text:string)=>PriceUpdate[]):Promise<AdapterResult>{
+  try{
+    const response=await fetchWithTimeout(url);
+    if(response.status===403||response.status===429)return{source:status(id,name,url,"blocked",`官网返回 ${response.status}；保留上次可信价格`),updates:[]};
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const text=textOnly(await response.text());
+    const found=signatures.filter(x=>text.toLowerCase().includes(x.toLowerCase()));
+    if(found.length<Math.ceil(signatures.length/2))return{source:status(id,name,url,"changed","关键字段缺失，解析器已停止写入"),updates:[]};
+    const updates=extract(text).filter(u=>u.input!=null&&u.output!=null&&u.input>0&&u.output>0);
+    if(!updates.length)return{source:status(id,name,url,"changed","页面可访问，但目标价格行未通过完整性校验"),updates:[]};
+    return{source:status(id,name,url,"ok",`成功解析官方价格表，${updates.length} 条通过完整性校验`,updates.length),updates};
+  }catch(error){return{source:status(id,name,url,"error",error instanceof Error?error.message:"抓取失败"),updates:[]}}
+}
+
+function moneyList(text:string){return[...text.matchAll(/\$\s*([0-9]+(?:\.[0-9]+)?)/g)].map(m=>Number(m[1]));}
+function section(text:string,start:string,end:string,max=2400){const at=text.toLowerCase().indexOf(start.toLowerCase());if(at<0)return"";const tail=text.slice(at,at+max);const stop=tail.toLowerCase().indexOf(end.toLowerCase(),start.length);return stop>0?tail.slice(0,stop):tail;}
+
+function anthropicPrices(text:string):PriceUpdate[]{
+  const row=section(text,"Claude Sonnet 4 ","Claude Haiku",700);
+  const values=moneyList(row);
+  return values.length>=5?[{model:"Claude 4 Sonnet",provider:"Anthropic 官方",input:values[0],write:values[1],cached:values[3],output:values[4],source:"anthropic"}]:[];
+}
+function googlePrices(text:string):PriceUpdate[]{
+  const block=section(text,"Gemini 2.5 Flash","Gemini 2.5 Flash-Lite",2600);
+  const standard=section(block,"Standard","Batch",1400);
+  const input=standard.match(/Input price[^$]{0,120}\$\s*([0-9.]+)/i)?.[1];
+  const output=standard.match(/Output price[^$]{0,120}\$\s*([0-9.]+)/i)?.[1];
+  const cached=standard.match(/Context caching price[^$]{0,120}\$\s*([0-9.]+)/i)?.[1];
+  return input&&output&&cached?[{model:"Gemini 2.5 Flash",provider:"Google AI",input:+input,cached:+cached,output:+output,source:"google"}]:[];
+}
+function deepseekPrices(text:string):PriceUpdate[]{
+  const block=section(text,"deepseek-v4-flash","Deduction Rules",2200);
+  const hit=block.match(/CACHE HIT[^$]{0,100}\$\s*([0-9.]+)/i)?.[1];
+  const miss=block.match(/CACHE MISS[^$]{0,100}\$\s*([0-9.]+)/i)?.[1];
+  const output=block.match(/OUTPUT TOKENS[^$]{0,100}\$\s*([0-9.]+)/i)?.[1];
+  return hit&&miss&&output?[{model:"DeepSeek V3.2",provider:"DeepSeek 官方",input:+miss,cached:+hit,output:+output,source:"deepseek"}]:[];
+}
+function qwenPrices(text:string):PriceUpdate[]{
+  const block=section(text,"qwen3.7-plus","qwen3.7-plus-2026",1800);
+  const discount=block.match(/原价\s*([0-9.]+)元\s*限时\s*([0-9.]+)折[\s\S]{0,100}?原价\s*([0-9.]+)元\s*限时\s*([0-9.]+)折/);
+  const plain=block.match(/0<Token≤256K[^0-9]{0,80}([0-9.]+)元[^0-9]{0,80}([0-9.]+)元/);
+  const inputCny=discount?+discount[1]*(+discount[2]/10):plain?+plain[1]:undefined;
+  const outputCny=discount?+discount[3]*(+discount[4]/10):plain?+plain[2]:undefined;
+  const CNY_PER_USD=7.2;
+  return inputCny&&outputCny?[{model:"Qwen3.7 Plus",provider:"阿里云百炼",input:Math.round(inputCny/CNY_PER_USD*1e6)/1e6,output:Math.round(outputCny/CNY_PER_USD*1e6)/1e6,source:"qwen"}]:[];
+}
+
 function maxChange(previous: { input:number|null; cached:number|null; cacheWrite:number|null; output:number|null } | undefined, next: PriceUpdate) {
   if (!previous) return 0;
   const pairs: Array<[number|null|undefined,number|undefined]> = [[previous.input,next.input],[previous.cached,next.cached],[previous.cacheWrite,next.write],[previous.output,next.output]];
@@ -82,16 +130,23 @@ function maxChange(previous: { input:number|null; cached:number|null; cacheWrite
 async function persist(updates: PriceUpdate[], sourceCount: number, okCount: number, collectedAt: string) {
   const db = getDb();
   const accepted: PriceUpdate[] = [];
+  const changes: PriceChange[] = [];
   let rejected = 0;
   for (const update of updates) {
     const [previous] = await db.select({ input:priceSnapshots.input,cached:priceSnapshots.cached,cacheWrite:priceSnapshots.cacheWrite,output:priceSnapshots.output }).from(priceSnapshots).where(and(eq(priceSnapshots.model,update.model),eq(priceSnapshots.provider,update.provider),eq(priceSnapshots.accepted,true))).orderBy(desc(priceSnapshots.collectedAt)).limit(1);
     const change = maxChange(previous,update);
     const safe = !previous || change <= 50;
     await db.insert(priceSnapshots).values({ collectedAt,model:update.model,provider:update.provider,source:update.source,input:update.input,cached:update.cached,cacheWrite:update.write,output:update.output,accepted:safe,confidence:safe?"structured":"anomaly",changePercent:change });
-    if (safe) accepted.push(update); else rejected++;
+    if (safe) {
+      accepted.push(update);
+      if(previous){
+        const fields:Array<["input"|"cached"|"write"|"output",number|null|undefined,number|undefined]>=[["input",previous.input,update.input],["cached",previous.cached,update.cached],["write",previous.cacheWrite,update.write],["output",previous.output,update.output]];
+        for(const[field,before,after]of fields)if(before&&after!=null&&Math.abs(after-before)>0.000001){const percent=Math.round((after-before)/before*10000)/100;changes.push({model:update.model,provider:update.provider,field,before,after,percent,direction:after>before?"up":"down"})}
+      }
+    } else rejected++;
   }
   await db.insert(collectionRuns).values({ collectedAt,sourceCount,okCount,updateCount:accepted.length,rejectedCount:rejected });
-  return { accepted,rejected };
+  return { accepted,rejected,changes };
 }
 
 export async function GET() {
@@ -99,16 +154,16 @@ export async function GET() {
     jsonCatalog("openrouter","OpenRouter","https://openrouter.ai/api/v1/models","OpenRouter"),
     jsonCatalog("opencode-go","OpenCode Go","https://opencode.ai/zen/go/v1/models","OpenCode Go"),
     publicPage("openai","OpenAI","https://openai.com/api/pricing/",["cached input","input","output","gpt-5"]),
-    publicPage("anthropic","Anthropic","https://docs.anthropic.com/en/docs/about-claude/pricing",["prompt caching","cache write","cache read","sonnet"]),
-    publicPage("google","Google AI","https://ai.google.dev/gemini-api/docs/pricing",["cached input","gemini 2.5 flash","context caching"]),
-    publicPage("deepseek","DeepSeek","https://api-docs.deepseek.com/quick_start/pricing",["cache hit","cache miss","deepseek-chat"]),
-    publicPage("qwen","阿里云百炼","https://help.aliyun.com/zh/model-studio/model-pricing",["qwen","上下文缓存","输入单价","输出单价"]),
+    pricedPage("anthropic","Anthropic","https://platform.claude.com/docs/en/about-claude/pricing",["Base Input Tokens","Cache Hits & Refreshes","Claude Sonnet 4"],anthropicPrices),
+    pricedPage("google","Google AI","https://ai.google.dev/gemini-api/docs/pricing",["Input price","Gemini 2.5 Flash","Context caching price"],googlePrices),
+    pricedPage("deepseek","DeepSeek","https://api-docs.deepseek.com/quick_start/pricing?push_animated=1&show_loading=0&theme=light",["deepseek-v4-flash","CACHE HIT","CACHE MISS"],deepseekPrices),
+    pricedPage("qwen","阿里云百炼","https://help.aliyun.com/zh/model-studio/model-pricing",["qwen3.7-plus","上下文缓存","输入单价","输出单价"],qwenPrices),
   ]);
   const results = adapters.map((r,i) => r.status === "fulfilled" ? r.value : { source: status(`adapter-${i}`,"未知来源","","error",String(r.reason)), updates: [] });
   const collectedAt = new Date().toISOString();
   const parsed = results.flatMap(r=>r.updates);
-  let updates = parsed, rejected = 0, persistence = "ok";
-  try { const saved = await persist(parsed,results.length,results.filter(r=>r.source.status==="ok").length,collectedAt); updates=saved.accepted; rejected=saved.rejected; }
+  let updates = parsed, rejected = 0, persistence = "ok", changes:PriceChange[] = [];
+  try { const saved = await persist(parsed,results.length,results.filter(r=>r.source.status==="ok").length,collectedAt); updates=saved.accepted; rejected=saved.rejected; changes=saved.changes; }
   catch (error) { persistence = error instanceof Error ? error.message : "snapshot storage failed"; }
-  return Response.json({ collectedAt, sources: results.map(r=>r.source), updates, rejected, persistence, policy: "public-pages-only; no authentication; no anti-bot bypass; >50% route changes quarantined" }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ collectedAt, sources: results.map(r=>r.source), updates, changes, rejected, persistence, policy: "public-pages-only; no authentication; no anti-bot bypass; >50% route changes quarantined" }, { headers: { "cache-control": "no-store" } });
 }

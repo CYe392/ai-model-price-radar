@@ -1,0 +1,14 @@
+{
+  "openrouter": {"format":"json","sample":"{\"data\":[{\"id\":\"openai/gpt-5-mini\",\"pricing\":{\"prompt\":\"0.00000025\",\"completion\":\"0.000002\"}}]}","anchors":["data","pricing","prompt","completion"]},
+  "opencode-go": {"format":"json","sample":"{\"data\":[{\"id\":\"deepseek-v4-flash\",\"pricing\":{\"input\":0.14,\"output\":0.28}}]}","anchors":["data","pricing","input","output"]},
+  "openai": {"format":"html","sample":"GPT-5 mini Input $0.25 Cached input $0.025 Output $2.00 GPT-5 nano","anchors":["GPT-5 mini","Cached input","Output"]},
+  "anthropic": {"format":"html","sample":"Claude Sonnet 4 $3 $3.75 $6 $0.30 $15 Claude Haiku","anchors":["Claude Sonnet 4","Cache Hits","Base Input Tokens"]},
+  "aws-bedrock": {"format":"html","sample":"Claude 4 Sonnet $3 $15 $1.50 $7.50 $3.75 $0.30 Claude 3.7 Sonnet","anchors":["Claude 4 Sonnet","cache write","cache read"]},
+  "azure-ai": {"format":"html","sample":"GPT-5 mini Input $0.28 Cached input $0.028 Output $2.10 GPT-5 nano","anchors":["GPT-5 mini","Input","Output"]},
+  "google": {"format":"html","sample":"Gemini 2.5 Flash Standard Input price $0.30 Output price $2.50 Context caching price $0.03 Batch Gemini 2.5 Flash-Lite","anchors":["Gemini 2.5 Flash","Input price","Context caching price"]},
+  "deepseek": {"format":"html","sample":"deepseek-v4-flash CACHE HIT $0.007 $0.022 $0.014 $0.044 CACHE MISS $0.22 $0.66 $0.44 $1.32 OUTPUT TOKENS $0.66 $1.98 $1.32 $3.96 Concurrency Limit","anchors":["CACHE HIT","CACHE MISS","OUTPUT TOKENS"]},
+  "qwen": {"format":"html","sample":"qwen3.7-plus 0<Token≤256K 原价 2 元 限时 5 折 原价 8 元 限时 5 折","anchors":["qwen3.7-plus","0<Token≤256K","原价"]},
+  "siliconflow": {"format":"html","sample":"DeepSeek-V4-Flash Input $0.23 Cached input $0.023 Output $0.37 DeepSeek-V4-Pro","anchors":["DeepSeek-V4-Flash","Input","Output"]},
+  "together": {"format":"html","sample":"DeepSeek-V4-Pro $1.74 $0.20 $3.48 DeepSeek-V4-Flash-0731 $0.14 $0.03 $0.28 NVIDIA Nemotron","anchors":["DeepSeek-V4-Pro","DeepSeek-V4-Flash-0731","Cached input"]},
+  "fireworks": {"format":"html","sample":"DeepSeek V4 Pro $1.74 $0.145 $3.48 DeepSeek V4 Flash (0731) $0.14 $0.028 $0.28 GLM 5.2","anchors":["DeepSeek V4 Pro","DeepSeek V4 Flash","Cached input tokens"]}
+}

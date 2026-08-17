@@ -15,6 +15,9 @@ const TARGETS = [
   { match: ["gemini-2.5-flash", "google/gemini-2.5-flash"], model: "Gemini 2.5 Flash" },
   { match: ["gpt-5-mini", "openai/gpt-5-mini"], model: "GPT-5 mini" },
   { match: ["claude-4-sonnet", "anthropic/claude-4-sonnet"], model: "Claude 4 Sonnet" },
+  { match: ["kimi-k2.6", "moonshotai/kimi-k2.6"], model: "Kimi K2.6" },
+  { match: ["glm-5.2", "zai-org/glm-5.2"], model: "GLM 5.2" },
+  { match: ["minimax-m3", "minimaxai/minimax-m3"], model: "MiniMax M3" },
 ];
 
 function dollars(value: unknown) {
@@ -124,12 +127,12 @@ function deepseekPrices(text:string):PriceUpdate[]{
 function togetherPrices(text:string):PriceUpdate[]{
   const parse=(start:string,end:string,model:string)=>{const values=moneyList(section(text,start,end,700));return values.length>=3?{model,provider:"Together AI",input:values[0],cached:values[1],output:values[2],source:"together",currency:"USD",pricingRegion:"全球",tier:"Serverless · Standard"}:null};
   const qwen=section(text,"Qwen3.7 Plus","Google Gemma",350).match(/\$\s*([0-9.]+)\s*-\s*\$\s*([0-9.]+)/);
-  return [parse("DeepSeek-V4-Pro","DeepSeek-V4-Flash","DeepSeek V4 Pro"),parse("DeepSeek-V4-Flash-0731","NVIDIA Nemotron","DeepSeek V4 Flash"),qwen?{model:"Qwen3.7 Plus",provider:"Together AI",input:+qwen[1],output:+qwen[2],source:"together",currency:"USD",pricingRegion:"全球",tier:"Serverless · Standard"}:null].filter((x):x is PriceUpdate=>x!==null);
+  return [parse("Kimi K2.6","Z.ai","Kimi K2.6"),parse("GLM-5.2","OpenAI GPT-OSS","GLM 5.2"),parse("DeepSeek-V4-Pro","DeepSeek-V4-Flash","DeepSeek V4 Pro"),parse("DeepSeek-V4-Flash-0731","NVIDIA Nemotron","DeepSeek V4 Flash"),qwen?{model:"Qwen3.7 Plus",provider:"Together AI",input:+qwen[1],output:+qwen[2],source:"together",currency:"USD",pricingRegion:"全球",tier:"Serverless · Standard"}:null].filter((x):x is PriceUpdate=>x!==null);
 }
 
 function fireworksPrices(text:string):PriceUpdate[]{
   const parse=(start:string,end:string,model:string)=>{const values=moneyList(section(text,start,end,500));return values.length>=3?{model,provider:"Fireworks AI",input:values[0],cached:values[1],output:values[2],source:"fireworks",currency:"USD",pricingRegion:"全球",tier:"Serverless · Standard"}:null};
-  return [parse("DeepSeek V4 Pro","DeepSeek V4 Flash","DeepSeek V4 Pro"),parse("DeepSeek V4 Flash (0731)","GLM 5.2","DeepSeek V4 Flash"),parse("Qwen 3.7 Plus","MiniMax M3","Qwen3.7 Plus")].filter((x):x is PriceUpdate=>x!==null);
+  return [parse("Kimi K2.6","Kimi K2.6 Fast","Kimi K2.6"),parse("DeepSeek V4 Pro","DeepSeek V4 Flash","DeepSeek V4 Pro"),parse("DeepSeek V4 Flash (0731)","GLM 5.2","DeepSeek V4 Flash"),parse("GLM 5.2","GLM 5.2 Fast","GLM 5.2"),parse("Qwen 3.7 Plus","MiniMax M3","Qwen3.7 Plus"),parse("MiniMax M3","MiniMax M2.7","MiniMax M3")].filter((x):x is PriceUpdate=>x!==null);
 }
 
 async function deepseekPage():Promise<AdapterResult>{

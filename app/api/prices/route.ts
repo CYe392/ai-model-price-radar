@@ -1,4 +1,7 @@
 export const dynamic = "force-dynamic";
+import { and, desc, eq } from "drizzle-orm";
+import { getDb } from "../../../db";
+import { collectionRuns, priceSnapshots } from "../../../db/schema";
 
 type SourceStatus = { id: string; name: string; url: string; status: "ok" | "changed" | "blocked" | "error"; detail: string; checkedAt: string; records: number };
 type PriceUpdate = { model: string; provider: string; input?: number; cached?: number; write?: number; output?: number; source: string };
@@ -15,7 +18,8 @@ const TARGETS = [
 function dollars(value: unknown) {
   const n = Number(value);
   if (!Number.isFinite(n)) return undefined;
-  return n < 0.01 ? n * 1_000_000 : n;
+  const normalized = n < 0.01 ? n * 1_000_000 : n;
+  return Math.round(normalized * 1_000_000) / 1_000_000;
 }
 
 async function fetchWithTimeout(url: string, accept = "text/html,application/json") {
@@ -69,6 +73,27 @@ async function publicPage(id: string, name: string, url: string, signatures: str
   } catch (error) { return { source: status(id,name,url,"error",error instanceof Error ? error.message : "抓取失败"), updates: [] }; }
 }
 
+function maxChange(previous: { input:number|null; cached:number|null; cacheWrite:number|null; output:number|null } | undefined, next: PriceUpdate) {
+  if (!previous) return 0;
+  const pairs: Array<[number|null|undefined,number|undefined]> = [[previous.input,next.input],[previous.cached,next.cached],[previous.cacheWrite,next.write],[previous.output,next.output]];
+  return pairs.reduce((max,[before,after]) => before && after != null ? Math.max(max,Math.abs((after-before)/before)*100) : max,0);
+}
+
+async function persist(updates: PriceUpdate[], sourceCount: number, okCount: number, collectedAt: string) {
+  const db = getDb();
+  const accepted: PriceUpdate[] = [];
+  let rejected = 0;
+  for (const update of updates) {
+    const [previous] = await db.select({ input:priceSnapshots.input,cached:priceSnapshots.cached,cacheWrite:priceSnapshots.cacheWrite,output:priceSnapshots.output }).from(priceSnapshots).where(and(eq(priceSnapshots.model,update.model),eq(priceSnapshots.provider,update.provider),eq(priceSnapshots.accepted,true))).orderBy(desc(priceSnapshots.collectedAt)).limit(1);
+    const change = maxChange(previous,update);
+    const safe = !previous || change <= 50;
+    await db.insert(priceSnapshots).values({ collectedAt,model:update.model,provider:update.provider,source:update.source,input:update.input,cached:update.cached,cacheWrite:update.write,output:update.output,accepted:safe,confidence:safe?"structured":"anomaly",changePercent:change });
+    if (safe) accepted.push(update); else rejected++;
+  }
+  await db.insert(collectionRuns).values({ collectedAt,sourceCount,okCount,updateCount:accepted.length,rejectedCount:rejected });
+  return { accepted,rejected };
+}
+
 export async function GET() {
   const adapters = await Promise.allSettled([
     jsonCatalog("openrouter","OpenRouter","https://openrouter.ai/api/v1/models","OpenRouter"),
@@ -80,5 +105,10 @@ export async function GET() {
     publicPage("qwen","阿里云百炼","https://help.aliyun.com/zh/model-studio/model-pricing",["qwen","上下文缓存","输入单价","输出单价"]),
   ]);
   const results = adapters.map((r,i) => r.status === "fulfilled" ? r.value : { source: status(`adapter-${i}`,"未知来源","","error",String(r.reason)), updates: [] });
-  return Response.json({ collectedAt: new Date().toISOString(), sources: results.map(r=>r.source), updates: results.flatMap(r=>r.updates), policy: "public-pages-only; no authentication; no anti-bot bypass" }, { headers: { "cache-control": "no-store" } });
+  const collectedAt = new Date().toISOString();
+  const parsed = results.flatMap(r=>r.updates);
+  let updates = parsed, rejected = 0, persistence = "ok";
+  try { const saved = await persist(parsed,results.length,results.filter(r=>r.source.status==="ok").length,collectedAt); updates=saved.accepted; rejected=saved.rejected; }
+  catch (error) { persistence = error instanceof Error ? error.message : "snapshot storage failed"; }
+  return Response.json({ collectedAt, sources: results.map(r=>r.source), updates, rejected, persistence, policy: "public-pages-only; no authentication; no anti-bot bypass; >50% route changes quarantined" }, { headers: { "cache-control": "no-store" } });
 }

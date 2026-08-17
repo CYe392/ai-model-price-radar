@@ -91,6 +91,19 @@ type M = {
   ability: number;
   providers: P[];
 };
+type Scenario = {
+  id: string;
+  icon: string;
+  title: string;
+  desc: string;
+  monthlyInput: number;
+  monthlyOutput: number;
+  cacheHit: number;
+  minAbility: number;
+  minContext: number;
+  emphasis: "chat" | "coding" | "reasoning" | "agentic" | "throughput" | "retrieval";
+  weights: { capability: number; cost: number; latency: number; cache: number; trust: number };
+};
 type FetchSource = {
   id: string;
   name: string;
@@ -595,21 +608,84 @@ const briefs = [
       "US deployments may use different model IDs and prices from China or international routes. This tool filters unavailable routes, but provider terms remain authoritative.",
   },
 ];
-const scenarios = [
+const scenarios: Scenario[] = [
   {
+    id: "daily-chat",
+    icon: "◎",
+    title: "Everyday chat & advice",
+    desc: "General questions, drafting, planning, and personal productivity",
+    monthlyInput: 20_000_000,
+    monthlyOutput: 5_000_000,
+    cacheHit: 20,
+    minAbility: 80,
+    minContext: 128_000,
+    emphasis: "chat",
+    weights: { capability: 30, cost: 35, latency: 20, cache: 5, trust: 10 },
+  },
+  {
+    id: "light-development",
+    icon: "⌘",
+    title: "Light & medium development",
+    desc: "Code completion, debugging, tests, reviews, and small features",
+    monthlyInput: 80_000_000,
+    monthlyOutput: 18_000_000,
+    cacheHit: 45,
+    minAbility: 88,
+    minContext: 200_000,
+    emphasis: "coding",
+    weights: { capability: 42, cost: 25, latency: 13, cache: 10, trust: 10 },
+  },
+  {
+    id: "intensive-development",
+    icon: "◆",
+    title: "Intensive development",
+    desc: "Large repositories, migrations, architecture, and difficult debugging",
+    monthlyInput: 350_000_000,
+    monthlyOutput: 90_000_000,
+    cacheHit: 60,
+    minAbility: 93,
+    minContext: 200_000,
+    emphasis: "reasoning",
+    weights: { capability: 55, cost: 15, latency: 8, cache: 10, trust: 12 },
+  },
+  {
+    id: "openclaw-agents",
+    icon: "◈",
+    title: "OpenClaw & agent automation",
+    desc: "Long-running tool use, browser work, orchestration, and recovery",
+    monthlyInput: 500_000_000,
+    monthlyOutput: 120_000_000,
+    cacheHit: 65,
+    minAbility: 92,
+    minContext: 200_000,
+    emphasis: "agentic",
+    weights: { capability: 48, cost: 16, latency: 8, cache: 12, trust: 16 },
+  },
+  {
+    id: "customer-support",
     icon: "⌁",
     title: "Customer support",
-    desc: "High throughput, predictable cost, multilingual quality",
+    desc: "High throughput, multilingual consistency, and predictable spend",
+    monthlyInput: 1_000_000_000,
+    monthlyOutput: 160_000_000,
+    cacheHit: 55,
+    minAbility: 84,
+    minContext: 128_000,
+    emphasis: "throughput",
+    weights: { capability: 25, cost: 40, latency: 18, cache: 10, trust: 7 },
   },
   {
-    icon: "⌘",
-    title: "Coding assistant",
-    desc: "Strong reasoning, long context, and tool use",
-  },
-  {
-    icon: "✦",
-    title: "Content pipelines",
-    desc: "High-volume summarization, classification, and extraction",
+    id: "long-context-rag",
+    icon: "▤",
+    title: "Long-context RAG",
+    desc: "Repository search, knowledge assistants, and repeated document context",
+    monthlyInput: 800_000_000,
+    monthlyOutput: 100_000_000,
+    cacheHit: 75,
+    minAbility: 88,
+    minContext: 400_000,
+    emphasis: "retrieval",
+    weights: { capability: 30, cost: 22, latency: 8, cache: 28, trust: 12 },
   },
 ];
 const regionOptions: Region[] = [
@@ -782,6 +858,22 @@ function formatMoney(value: number, currency: Currency, digits = 3) {
     maximumFractionDigits: currency === "JPY" ? 2 : digits,
   }).format(value * currencyRates[currency]);
 }
+function contextSize(context: string) {
+  const value = Number.parseFloat(context);
+  return context.toUpperCase().includes("M") ? value * 1_000_000 : value * 1_000;
+}
+function modelStrength(m: M, emphasis: Scenario["emphasis"]) {
+  const name = `${m.name} ${m.company}`.toLowerCase();
+  const boosts: Record<Scenario["emphasis"], number> = {
+    chat: name.includes("gpt") || name.includes("claude") || name.includes("gemini") ? 5 : 1,
+    coding: name.includes("claude") || name.includes("deepseek") || name.includes("gpt") ? 7 : 1,
+    reasoning: name.includes("claude") || name.includes("deepseek") || name.includes("glm") ? 7 : 1,
+    agentic: name.includes("claude") || name.includes("gpt") || name.includes("qwen") ? 7 : 1,
+    throughput: name.includes("flash") || name.includes("mini") || name.includes("qwen") ? 6 : 1,
+    retrieval: contextSize(m.context) >= 1_000_000 ? 8 : contextSize(m.context) >= 400_000 ? 4 : 0,
+  };
+  return Math.min(100, m.ability + boosts[emphasis]);
+}
 export default function Home() {
   const [tab, setTab] = useState("prices"),
     [q, setQ] = useState(""),
@@ -791,6 +883,9 @@ export default function Home() {
     [availabilityStage, setAvailabilityStage] = useState<AvailabilityStage>("purchase"),
     [compliance, setCompliance] = useState<ComplianceFilter>("all"),
     [currency, setCurrency] = useState<Currency>("USD"),
+    [scenarioId, setScenarioId] = useState("daily-chat"),
+    [workloadScale, setWorkloadScale] = useState("standard"),
+    [riskProfile, setRiskProfile] = useState("balanced"),
     [busy, setBusy] = useState(false),
     [updated, setUpdated] = useState("Not refreshed yet"),
     [toast, setToast] = useState(false),
@@ -950,28 +1045,104 @@ export default function Home() {
       setBusy(false);
     }
   }
-  function recommendation(i: number) {
-    const candidates = liveModels
-      .flatMap((m) =>
-        m.providers
-          .filter(available)
-          .map((p) => ({
+  const selectedScenario = scenarios.find((s) => s.id === scenarioId) ?? scenarios[0];
+  const scaleMultiplier = { pilot: 0.25, standard: 1, production: 5 }[workloadScale] ?? 1;
+  const scenarioInputM = (selectedScenario.monthlyInput * scaleMultiplier) / 1e6;
+  const scenarioOutputM = (selectedScenario.monthlyOutput * scaleMultiplier) / 1e6;
+  const scenarioHit = selectedScenario.cacheHit / 100;
+  const rankedRecommendations = liveModels
+    .flatMap((m) =>
+      m.providers
+        .filter(available)
+        .filter(
+          (p) =>
+            m.ability >= selectedScenario.minAbility &&
+            contextSize(m.context) >= selectedScenario.minContext &&
+            (riskProfile !== "enterprise" || routePolicy(p).noTraining),
+        )
+        .map((p) => {
+          const policy = routePolicy(p);
+          const monthlyUsd =
+            scenarioInputM * (1 - scenarioHit) * p.input +
+            scenarioInputM * scenarioHit * (p.cached ?? p.input) +
+            scenarioOutputM * p.output +
+            Number(p.plan?.match(/\$([0-9.]+)/)?.[1] ?? 0);
+          const capability = modelStrength(m, selectedScenario.emphasis);
+          const workloadAnchor = Math.max(
+            1,
+            ((selectedScenario.monthlyInput + selectedScenario.monthlyOutput) / 1e6) *
+              scaleMultiplier *
+              0.5,
+          );
+          const cost = Math.max(0, Math.min(100, 100 / (1 + monthlyUsd / workloadAnchor)));
+          const latency = Math.max(0, Math.min(100, 110 - p.latency / 8));
+          const cache = p.cached == null
+            ? 25
+            : Math.max(0, Math.min(100, 100 - (p.cached / Math.max(p.input, 0.0001)) * 100));
+          const trustBase =
+            p.verificationStatus === "verified"
+              ? 100
+              : p.verificationStatus === "previously_verified"
+                ? 82
+                : p.sourceUrl
+                  ? 72
+                  : 55;
+          const trust = Math.min(
+            100,
+            trustBase +
+              (policy.source ? 6 : 0) +
+              (policy.noTraining ? 5 : 0) +
+              (policy.sla ? 5 : 0) +
+              (riskProfile === "enterprise" && policy.regionalProcessing ? 5 : 0),
+          );
+          const weights = { ...selectedScenario.weights };
+          if (priority === "price") {
+            weights.cost += 24;
+            weights.capability = Math.max(10, weights.capability - 14);
+          } else if (priority === "ability") {
+            weights.capability += 24;
+            weights.cost = Math.max(8, weights.cost - 14);
+          }
+          if (riskProfile === "enterprise") weights.trust += 18;
+          if (riskProfile === "experimental") weights.trust = Math.max(3, weights.trust - 6);
+          const totalWeight = Object.values(weights).reduce((sum, value) => sum + value, 0);
+          const score =
+            (capability * weights.capability +
+              cost * weights.cost +
+              latency * weights.latency +
+              cache * weights.cache +
+              trust * weights.trust) /
+            totalWeight;
+          const confidence =
+            trust >= 85 && Math.abs(m.ability - selectedScenario.minAbility) >= 5
+              ? "High"
+              : trust >= 65
+                ? "Medium"
+                : "Directional";
+          return {
             m,
             p,
-            score:
-              priority === "price"
-                ? 100 - (p.input + p.output) * 8
-                : priority === "ability"
-                  ? m.ability - p.latency / 1000
-                  : m.ability * 0.55 -
-                    (p.input + p.output) * 3 -
-                    (p.latency / 100) * 0.7 +
-                    (i === 0 && m.company.includes("Alibaba") ? 5 : 0),
-          })),
-      )
-      .sort((a, b) => b.score - a.score);
-    return candidates[i === 2 ? Math.min(1, candidates.length - 1) : 0];
-  }
+            policy,
+            score,
+            monthlyUsd,
+            confidence,
+            breakdown: { capability, cost, latency, cache, trust },
+          };
+        }),
+    )
+    .sort((a, b) => b.score - a.score);
+  const recommendationExclusions = liveModels.reduce(
+    (count, m) =>
+      count +
+      m.providers.filter(
+        (p) =>
+          !available(p) ||
+          m.ability < selectedScenario.minAbility ||
+          contextSize(m.context) < selectedScenario.minContext ||
+          (riskProfile === "enterprise" && !routePolicy(p).noTraining),
+      ).length,
+    0,
+  );
   return (
     <main>
       <Header tab={tab} setTab={setTab} />
@@ -1240,9 +1411,24 @@ export default function Home() {
           <>
             <Title
               label="USE-CASE MATCHING"
-              title="Choose an API for the job"
-              sub="Recommendations update with your region and priorities. Validate production workloads with a small-scale test."
+              title="Start with the work you need to do"
+              sub="Choose a scenario, region, operating scale, and risk posture. The engine explains its score, projected bill, and alternatives."
             />
+            <div className="useCasePicker">
+              {scenarios.map((scenario) => (
+                <button
+                  key={scenario.id}
+                  className={scenarioId === scenario.id ? "selected" : ""}
+                  onClick={() => setScenarioId(scenario.id)}
+                >
+                  <i>{scenario.icon}</i>
+                  <span>
+                    <b>{scenario.title}</b>
+                    <small>{scenario.desc}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
             <div className="recommendFilters">
               <Filter
                 label="Region"
@@ -1258,6 +1444,26 @@ export default function Home() {
                   "price|Lowest cost",
                   "balanced|Cost / capability balance",
                   "ability|Best capability",
+                ]}
+              />
+              <Filter
+                label="Workload"
+                value={workloadScale}
+                set={setWorkloadScale}
+                options={[
+                  "pilot|Pilot · 0.25×",
+                  "standard|Standard · 1×",
+                  "production|Production · 5×",
+                ]}
+              />
+              <Filter
+                label="Risk posture"
+                value={riskProfile}
+                set={setRiskProfile}
+                options={[
+                  "experimental|Experimental",
+                  "balanced|Balanced",
+                  "enterprise|Enterprise controls",
                 ]}
               />
               <Filter
@@ -1291,52 +1497,90 @@ export default function Home() {
                 options={["USD", "EUR", "GBP", "CNY", "JPY", "AUD"]}
               />
               <span>
-                Ranking applies region, access stage, and compliance together
+                {rankedRecommendations.length} eligible · {recommendationExclusions} excluded
               </span>
             </div>
-            <div className="caseGrid">
-              {scenarios.map((c, i) => {
-                const r = recommendation(i);
-                return (
-                  <article key={c.title}>
-                    <i>{c.icon}</i>
-                    <h3>{c.title}</h3>
-                    <p>{c.desc}</p>
-                    <div className="pick">
-                      <small>
-                        BEST FIT ·{" "}
-                        {priority === "price"
-                          ? "COST FIRST"
-                          : priority === "ability"
-                            ? "CAPABILITY FIRST"
-                            : "BALANCED"}
-                      </small>
-                      <strong>{r?.m.name}</strong>
-                      <span>{providerLabel(r?.p.name || "")}</span>
-                    </div>
-                    <div className="price">
-                      <span>Input / cache read / output</span>
-                      <b>
-                        {r ? `${formatMoney(r.p.input, currency, 4)} / ${r.p.cached != null ? formatMoney(r.p.cached, currency, 4) : "—"} / ${formatMoney(r.p.output, currency, 4)}` : "No eligible route"}
-                      </b>
-                    </div>
-                    <p>
-                      {availabilityLabel(availabilityStage)} in {regionLabel(region)}; {complianceLabel(compliance).toLowerCase()}. Ranked by model quality, route cost, cache pricing, and latency.
-                    </p>
-                    <button onClick={() => setTab("prices")}>
-                      Compare all available routes →
-                    </button>
-                  </article>
-                );
-              })}
+            <div className="scenarioBrief">
+              <div>
+                <small>WORKLOAD PROFILE</small>
+                <strong>{formatTokens(selectedScenario.monthlyInput * scaleMultiplier)} input</strong>
+                <span>{formatTokens(selectedScenario.monthlyOutput * scaleMultiplier)} output / month</span>
+              </div>
+              <div>
+                <small>EXPECTED CACHE HIT</small>
+                <strong>{selectedScenario.cacheHit}%</strong>
+                <span>{selectedScenario.emphasis} emphasis</span>
+              </div>
+              <div>
+                <small>MINIMUM FIT</small>
+                <strong>{selectedScenario.minAbility} ability</strong>
+                <span>{formatTokens(selectedScenario.minContext)} context</span>
+              </div>
+              <p>{selectedScenario.desc}. Estimates use public token prices and the scenario workload; run an eval before production.</p>
             </div>
+            {rankedRecommendations.length ? (
+              <div className="recommendationEngine">
+                <article className="bestRecommendation">
+                  <div className="recommendationTopline">
+                    <span>BEST FIT · {rankedRecommendations[0].confidence.toUpperCase()} CONFIDENCE</span>
+                    <strong>{rankedRecommendations[0].score.toFixed(1)}</strong>
+                  </div>
+                  <h2>{rankedRecommendations[0].m.name}</h2>
+                  <h3>{providerLabel(rankedRecommendations[0].p.name)}</h3>
+                  <div className="recommendationCost">
+                    <span>Projected monthly API cost</span>
+                    <strong>{formatMoney(rankedRecommendations[0].monthlyUsd, currency, 2)}</strong>
+                    <small>{formatMoney(rankedRecommendations[0].monthlyUsd * 12, currency, 2)} / year</small>
+                  </div>
+                  <div className="scoreBreakdown">
+                    {Object.entries(rankedRecommendations[0].breakdown).map(([label, value]) => (
+                      <div key={label}>
+                        <span><b>{label}</b><em>{value.toFixed(0)}</em></span>
+                        <i><b style={{ width: `${value}%` }} /></i>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="recommendationWhy">
+                    <b>Why it leads</b>
+                    <p>
+                      It clears the scenario&apos;s {selectedScenario.minAbility} ability and {formatTokens(selectedScenario.minContext)} context thresholds, while its projected cost and cache economics remain competitive for this workload.
+                    </p>
+                    <span>{rankedRecommendations[0].policy.trainingLabel}</span>
+                    <span>{rankedRecommendations[0].policy.retentionLabel}</span>
+                  </div>
+                  <button onClick={() => setTab("calculator")}>Open full cost model →</button>
+                </article>
+                <div className="alternativeRoutes">
+                  <div>
+                    <b>ALTERNATIVES</b>
+                    <span>Different trade-offs, same hard filters</span>
+                  </div>
+                  {rankedRecommendations.slice(1, 4).map((candidate, index) => (
+                    <article key={`${candidate.m.name}-${candidate.p.name}`}>
+                      <em>#{index + 2}</em>
+                      <div>
+                        <strong>{candidate.m.name}</strong>
+                        <span>{providerLabel(candidate.p.name)} · {candidate.confidence} confidence</span>
+                      </div>
+                      <b>{candidate.score.toFixed(1)}</b>
+                      <small>{formatMoney(candidate.monthlyUsd, currency, 2)} / mo</small>
+                      <p>
+                        Capability {candidate.breakdown.capability.toFixed(0)} · cost {candidate.breakdown.cost.toFixed(0)} · trust {candidate.breakdown.trust.toFixed(0)}
+                      </p>
+                    </article>
+                  ))}
+                  <div className="recommendationGuardrail">
+                    <b>{recommendationExclusions} routes excluded</b>
+                    <span>Region, compliance, account access, ability, context, and enterprise policy requirements are applied before scoring.</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="empty">No route clears every hard requirement. Relax the region, compliance, risk, ability, or context constraints.</div>
+            )}
             <div className="method">
-              <b>Dynamic weights</b>
-              {priority === "price"
-                ? "Cost 65% · capability 20% · latency 15%"
-                : priority === "ability"
-                  ? "Capability 70% · cost 15% · latency 15%"
-                  : "Capability 45% · cost 35% · latency 20%"}
+              <b>Transparent scoring</b>
+              Base weights: capability {selectedScenario.weights.capability}% · cost {selectedScenario.weights.cost}% · latency {selectedScenario.weights.latency}% · cache {selectedScenario.weights.cache}% · trust {selectedScenario.weights.trust}%. Priority and risk choices adjust these weights before normalization. Capability and latency are editorial planning inputs, not live benchmarks.
             </div>
           </>
         )}

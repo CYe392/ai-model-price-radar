@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.0 — Recommendation Engine 2.0
+
+- Added scenario-first discovery for everyday chat, light/medium development, intensive development, OpenClaw and agent automation, customer support, and long-context RAG.
+- Added pilot, standard, and production workload profiles with explicit input, output, and cache assumptions.
+- Added experimental, balanced, and enterprise risk postures and hard minimum ability/context requirements.
+- Added explainable capability, cost, latency, cache, and trust scoring with confidence labels.
+- Added projected monthly and annual spend, three ranked alternatives, exclusion counts, and operational guardrails.
+- Kept region, access stage, compliance, priority, and currency synchronized with every recommendation.
+
 ## v1.3.0 — Region, availability, and compliance
 
 - Replaced broad regional buckets with explicit US, Canada, EU, UK, Mainland China, Hong Kong, Singapore, Japan, and Australia views.

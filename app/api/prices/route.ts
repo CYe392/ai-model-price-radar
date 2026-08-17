@@ -4,7 +4,7 @@ import { getDb } from "../../../db";
 import { collectionRuns, priceSnapshots } from "../../../db/schema";
 
 type SourceStatus = { id: string; name: string; url: string; status: "ok" | "changed" | "blocked" | "error"; detail: string; checkedAt: string; records: number };
-type PriceUpdate = { model: string; provider: string; input?: number; cached?: number; write?: number; output?: number; source: string };
+type PriceUpdate = { model: string; provider: string; input?: number; cached?: number; write?: number; output?: number; source: string; currency?: string; nativeInput?: number; nativeOutput?: number; listInput?: number; listOutput?: number; discountPercent?: number; pricingRegion?: string; fxRate?: number; fxAsOf?: string; tier?: string };
 type AdapterResult = { source: SourceStatus; updates: PriceUpdate[] };
 type PriceChange = { model:string;provider:string;field:string;before:number;after:number;percent:number;direction:"up"|"down" };
 
@@ -60,7 +60,7 @@ async function jsonCatalog(id: string, name: string, url: string, provider: stri
   }
 }
 
-function textOnly(html: string) { return html.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\s+/g," ").trim(); }
+function textOnly(html: string) { return html.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/&lt;/gi,"<").replace(/&gt;/gi,">").replace(/&le;/gi,"≤").replace(/&ge;/gi,"≥").replace(/&yen;/gi,"¥").replace(/&amp;/gi,"&").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/\s+/g," ").trim(); }
 
 async function publicPage(id: string, name: string, url: string, signatures: string[]): Promise<AdapterResult> {
   try {
@@ -111,14 +111,29 @@ function deepseekPrices(text:string):PriceUpdate[]{
   const output=block.match(/OUTPUT TOKENS[^$]{0,100}\$\s*([0-9.]+)/i)?.[1];
   return hit&&miss&&output?[{model:"DeepSeek V3.2",provider:"DeepSeek 官方",input:+miss,cached:+hit,output:+output,source:"deepseek"}]:[];
 }
-function qwenPrices(text:string):PriceUpdate[]{
-  const block=section(text,"qwen3.7-plus","qwen3.7-plus-2026",1800);
-  const discount=block.match(/原价\s*([0-9.]+)元\s*限时\s*([0-9.]+)折[\s\S]{0,100}?原价\s*([0-9.]+)元\s*限时\s*([0-9.]+)折/);
-  const plain=block.match(/0<Token≤256K[^0-9]{0,80}([0-9.]+)元[^0-9]{0,80}([0-9.]+)元/);
+function qwenPrices(text:string,fxRate=7.2,fxAsOf="reference"):PriceUpdate[]{
+  const at=text.toLowerCase().indexOf("qwen3.7-plus");
+  const block=at<0?"":text.slice(at,at+1200);
+  const discount=block.match(/原价\s*([0-9.]+)\s*元\s*限时\s*([0-9.]+)\s*折[\s\S]{0,100}?原价\s*([0-9.]+)\s*元\s*限时\s*([0-9.]+)\s*折/);
+  const plain=block.match(/0<Token≤256K[^0-9]{0,80}([0-9.]+)\s*元[^0-9]{0,80}([0-9.]+)\s*元/);
   const inputCny=discount?+discount[1]*(+discount[2]/10):plain?+plain[1]:undefined;
   const outputCny=discount?+discount[3]*(+discount[4]/10):plain?+plain[2]:undefined;
-  const CNY_PER_USD=7.2;
-  return inputCny&&outputCny?[{model:"Qwen3.7 Plus",provider:"阿里云百炼",input:Math.round(inputCny/CNY_PER_USD*1e6)/1e6,output:Math.round(outputCny/CNY_PER_USD*1e6)/1e6,source:"qwen"}]:[];
+  return inputCny&&outputCny?[{model:"Qwen3.7 Plus",provider:"阿里云百炼",input:Math.round(inputCny/fxRate*1e6)/1e6,output:Math.round(outputCny/fxRate*1e6)/1e6,source:"qwen",currency:"CNY",nativeInput:inputCny,nativeOutput:outputCny,listInput:discount?+discount[1]:inputCny,listOutput:discount?+discount[3]:outputCny,discountPercent:discount?100-(+discount[2]*10):undefined,pricingRegion:"中国大陆 · 华北2（北京）",fxRate,fxAsOf,tier:"0<Token≤256K"}]:[];
+}
+
+async function qwenPage():Promise<AdapterResult>{
+  const id="qwen",name="阿里云百炼",url="https://help.aliyun.com/zh/model-studio/model-pricing";
+  try{
+    const [page,fx]=await Promise.all([fetchWithTimeout(url),fetchWithTimeout("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml","application/xml")]);
+    if(page.status===403||page.status===429)return{source:status(id,name,url,"blocked",`官网返回 ${page.status}；保留上次可信价格`),updates:[]};
+    if(!page.ok)throw new Error(`HTTP ${page.status}`);
+    const text=textOnly(await page.text());
+    let fxRate=7.2,fxAsOf="reference";
+    if(fx.ok){const xml=await fx.text();const usd=xml.match(/currency=['\"]USD['\"] rate=['\"]([0-9.]+)/)?.[1];const cny=xml.match(/currency=['\"]CNY['\"] rate=['\"]([0-9.]+)/)?.[1];const date=xml.match(/time=['\"]([0-9-]+)/)?.[1];if(usd&&cny){fxRate=+cny/+usd;fxAsOf=date||"ECB daily"}}
+    const updates=qwenPrices(text,fxRate,fxAsOf);
+    if(!updates.length)return{source:status(id,name,url,"changed","页面可访问，但北京地域目标价格行未通过完整性校验"),updates:[]};
+    return{source:status(id,name,url,"ok",`解析北京地域促销价；原币种 CNY，ECB 汇率 ${fxRate.toFixed(4)}（${fxAsOf}）`,updates.length),updates};
+  }catch(error){return{source:status(id,name,url,"error",error instanceof Error?error.message:"抓取失败"),updates:[]}}
 }
 
 function maxChange(previous: { input:number|null; cached:number|null; cacheWrite:number|null; output:number|null } | undefined, next: PriceUpdate) {
@@ -136,7 +151,7 @@ async function persist(updates: PriceUpdate[], sourceCount: number, okCount: num
     const [previous] = await db.select({ input:priceSnapshots.input,cached:priceSnapshots.cached,cacheWrite:priceSnapshots.cacheWrite,output:priceSnapshots.output }).from(priceSnapshots).where(and(eq(priceSnapshots.model,update.model),eq(priceSnapshots.provider,update.provider),eq(priceSnapshots.accepted,true))).orderBy(desc(priceSnapshots.collectedAt)).limit(1);
     const change = maxChange(previous,update);
     const safe = !previous || change <= 50;
-    await db.insert(priceSnapshots).values({ collectedAt,model:update.model,provider:update.provider,source:update.source,input:update.input,cached:update.cached,cacheWrite:update.write,output:update.output,accepted:safe,confidence:safe?"structured":"anomaly",changePercent:change });
+    await db.insert(priceSnapshots).values({ collectedAt,model:update.model,provider:update.provider,source:update.source,input:update.input,cached:update.cached,cacheWrite:update.write,output:update.output,currency:update.currency,nativeInput:update.nativeInput,nativeOutput:update.nativeOutput,listInput:update.listInput,listOutput:update.listOutput,discountPercent:update.discountPercent,pricingRegion:update.pricingRegion,fxRate:update.fxRate,fxAsOf:update.fxAsOf,tier:update.tier,accepted:safe,confidence:safe?"structured":"anomaly",changePercent:change });
     if (safe) {
       accepted.push(update);
       if(previous){
@@ -156,8 +171,8 @@ export async function GET() {
     publicPage("openai","OpenAI","https://openai.com/api/pricing/",["cached input","input","output","gpt-5"]),
     pricedPage("anthropic","Anthropic","https://platform.claude.com/docs/en/about-claude/pricing",["Base Input Tokens","Cache Hits & Refreshes","Claude Sonnet 4"],anthropicPrices),
     pricedPage("google","Google AI","https://ai.google.dev/gemini-api/docs/pricing",["Input price","Gemini 2.5 Flash","Context caching price"],googlePrices),
-    pricedPage("deepseek","DeepSeek","https://api-docs.deepseek.com/quick_start/pricing?push_animated=1&show_loading=0&theme=light",["deepseek-v4-flash","CACHE HIT","CACHE MISS"],deepseekPrices),
-    pricedPage("qwen","阿里云百炼","https://help.aliyun.com/zh/model-studio/model-pricing",["qwen3.7-plus","上下文缓存","输入单价","输出单价"],qwenPrices),
+    pricedPage("deepseek","DeepSeek","https://api-docs.deepseek.com/quick_start/pricing",["deepseek-v4-flash","CACHE HIT","CACHE MISS"],deepseekPrices),
+    qwenPage(),
   ]);
   const results = adapters.map((r,i) => r.status === "fulfilled" ? r.value : { source: status(`adapter-${i}`,"未知来源","","error",String(r.reason)), updates: [] });
   const collectedAt = new Date().toISOString();

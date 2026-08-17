@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.6.0 — Public API and integrations
+
+- Added versioned CORS-enabled read APIs for catalog, comparison, recommendations, and collection health.
+- Added structured response envelopes, validation errors, cache headers, API version metadata, and fair-use guidance.
+- Added workload-aware blended comparisons and scenario recommendations with score breakdowns.
+- Added an OpenAPI 3.1 document plus cURL, JavaScript, and Python integration examples.
+- Added a dedicated developer documentation page and an iframe-friendly price table at `/embed`.
+- Kept all public read endpoints separate from the manual provider-refresh workflow.
+
 ## v1.5.0 — History, alerts, and Market Brief 2.0
 
 - Added 7-day, 30-day, 90-day, and all-history views with route trends, largest moves, accepted-snapshot counts, and CSV export.

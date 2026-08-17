@@ -1843,6 +1843,7 @@ function Header({ tab, setTab }: { tab: string; setTab: (v: string) => void }) {
             {x[1]}
           </button>
         ))}
+        <a className="navExternal" href="/api-docs">Developers ↗</a>
       </nav>
       <div className="health">
         <i /> Public sources online{" "}

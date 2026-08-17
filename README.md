@@ -11,6 +11,7 @@ AI API price intelligence dashboard that compares official pricing, cache econom
 - Price history, source-health monitoring, and anomaly quarantine
 - Market briefs and scenario recommendations with price/capability priorities
 - Responsive English interface designed for North American and European users
+- Versioned read-only JSON API, OpenAPI 3.1 document, and embeddable price table
 
 No provider accounts or paid inference APIs are required for collection. Provider billing pages remain authoritative.
 
@@ -35,6 +36,20 @@ npm run lint
 The application uses React and vinext on Cloudflare Workers. Structured price snapshots, collection runs, and source-health checks are persisted in Cloudflare D1 through Drizzle ORM. Deployment configuration is stored in `.openai/hosting.json`.
 
 Price collection follows a public-pages-only policy: no authentication, no anti-bot bypass, and route changes above 50% are quarantined for review.
+
+## Public API
+
+The production service exposes cached, CORS-enabled read endpoints. Reading these endpoints never starts a provider refresh.
+
+```text
+GET /api/v1/catalog
+GET /api/v1/compare?region=US&sort=blended&cache_hit=0.6
+GET /api/v1/recommend?scenario=openclaw-agents&region=US
+GET /api/v1/health
+GET /api/v1/openapi.json
+```
+
+Interactive documentation is available at `/api-docs`, and the compact `/embed` page can be placed in an iframe. Public access is fair-use; consumers should cache responses and treat linked provider billing pages as authoritative.
 
 ## Releases
 

@@ -144,6 +144,21 @@ type PriceChange = {
   percent: number;
   direction: "up" | "down";
 };
+type AlertRule = {
+  id: string;
+  model: string;
+  provider: string;
+  direction: "up" | "down" | "either";
+  threshold: number;
+  enabled: boolean;
+  createdAt: string;
+};
+type AlertEvent = {
+  id: string;
+  ruleId: string;
+  change: PriceChange;
+  triggeredAt: string;
+};
 type HistorySnapshot = {
   id: number;
   collectedAt: string;
@@ -585,27 +600,42 @@ const models: M[] = [
 const briefs = [
   {
     tag: "ROUTER",
+    category: "routing",
+    severity: "medium",
+    region: "US / EU / Singapore",
     time: "Today · 11:40",
     title: "OpenCode Go subscription pricing added",
     text: "OpenCode Go combines a $10/month base subscription with dollar-denominated five-hour, weekly, and monthly usage allowances.",
     impact:
       "It can suit sustained open-model coding workloads. Low-volume users should still compare pay-as-you-go routes. Coverage focuses on the US, EU, and Singapore.",
+    scenarios: ["Light development", "OpenClaw"],
+    sourceUrl: "https://opencode.ai/",
   },
   {
     tag: "PRICING",
+    category: "pricing",
+    severity: "high",
+    region: "Global",
     time: "Today · 10:24",
     title: "Cache pricing is now included in route cost",
     text: "Cached input can cost 5–100× less than standard input, while some providers charge separately for cache writes.",
     impact:
       "Long system prompts, stable RAG prefixes, and repository context benefit most. Compare input, output, expected hit rate, and write frequency together.",
+    scenarios: ["Long-context RAG", "Intensive development"],
+    sourceUrl: "https://platform.openai.com/docs/pricing",
   },
   {
     tag: "REGION",
+    category: "availability",
+    severity: "high",
+    region: "China / International / US",
     time: "Today · 09:10",
     title: "Qwen pricing differs across global, China, and US routes",
     text: "Alibaba Cloud prices models by deployment region and context tier, with limited-time discounts on selected SKUs.",
     impact:
       "US deployments may use different model IDs and prices from China or international routes. This tool filters unavailable routes, but provider terms remain authoritative.",
+    scenarios: ["Everyday chat", "Development", "OpenClaw"],
+    sourceUrl: "https://www.alibabacloud.com/help/en/model-studio/model-pricing",
   },
 ];
 const scenarios: Scenario[] = [
@@ -901,6 +931,27 @@ export default function Home() {
     [historyLoaded, setHistoryLoaded] = useState(false),
     [historyBusy, setHistoryBusy] = useState(false),
     [historyError, setHistoryError] = useState("");
+  const [alerts, setAlerts] = useState<AlertRule[]>([]),
+    [alertEvents, setAlertEvents] = useState<AlertEvent[]>([]),
+    [alertsLoaded, setAlertsLoaded] = useState(false),
+    [briefCategory, setBriefCategory] = useState("all"),
+    [briefSeverity, setBriefSeverity] = useState("all");
+  useEffect(() => {
+    try {
+      setAlerts(JSON.parse(localStorage.getItem("modelscope-alert-rules") || "[]"));
+      setAlertEvents(JSON.parse(localStorage.getItem("modelscope-alert-events") || "[]"));
+    } catch {
+      setAlerts([]);
+      setAlertEvents([]);
+    } finally {
+      setAlertsLoaded(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (!alertsLoaded) return;
+    localStorage.setItem("modelscope-alert-rules", JSON.stringify(alerts));
+    localStorage.setItem("modelscope-alert-events", JSON.stringify(alertEvents));
+  }, [alerts, alertEvents, alertsLoaded]);
   useEffect(() => {
     if (!["history", "health"].includes(tab) || historyLoaded) return;
     setHistoryBusy(true);
@@ -1009,6 +1060,9 @@ export default function Home() {
         .slice(0, 8)
         .map((c) => ({
           tag: c.direction === "up" ? "PRICE UP" : "PRICE DOWN",
+          category: "pricing",
+          severity: Math.abs(c.percent) >= 25 ? "high" : Math.abs(c.percent) >= 10 ? "medium" : "low",
+          region: "All documented routes",
           time: "Latest refresh",
           title: `${providerLabel(c.provider)} · ${c.model} ${fieldName(c.field)} ${c.direction === "up" ? "rose" : "fell"} ${Math.abs(c.percent)}%`,
           text: `Per-million-token price moved from $${c.before} to $${c.after}.`,
@@ -1016,8 +1070,17 @@ export default function Home() {
             c.direction === "up"
               ? "This route is now more expensive and will rank lower for cost-focused recommendations. Review alternatives."
               : "This route is now cheaper and may rank higher in cost-focused recommendations.",
+          scenarios: c.field === "cached"
+            ? ["Long-context RAG", "OpenClaw"]
+            : ["Everyday chat", "Development", "Customer support"],
+          sourceUrl: "",
         }))
     : briefs;
+  const filteredBriefs = liveBriefs.filter(
+    (brief) =>
+      (briefCategory === "all" || brief.category === briefCategory) &&
+      (briefSeverity === "all" || brief.severity === briefSeverity),
+  );
   async function refresh() {
     if (busy) return;
     setBusy(true);
@@ -1033,7 +1096,27 @@ export default function Home() {
       };
       setSources(data.sources);
       setUpdates(data.updates);
-      setChanges(data.changes || []);
+      const latestChanges = data.changes || [];
+      setChanges(latestChanges);
+      const triggered = latestChanges.flatMap((change) =>
+        alerts
+          .filter(
+            (rule) =>
+              rule.enabled &&
+              (rule.model === "all" || rule.model === change.model) &&
+              (rule.provider === "all" || rule.provider === change.provider) &&
+              (rule.direction === "either" || rule.direction === change.direction) &&
+              Math.abs(change.percent) >= rule.threshold,
+          )
+          .map((rule) => ({
+            id: `${rule.id}-${data.collectedAt}-${change.field}`,
+            ruleId: rule.id,
+            change,
+            triggeredAt: data.collectedAt,
+          })),
+      );
+      if (triggered.length)
+        setAlertEvents((current) => [...triggered, ...current].slice(0, 50));
       setUpdated(
         new Date(data.collectedAt).toLocaleString("en-US", { hour12: false }),
       );
@@ -1044,6 +1127,28 @@ export default function Home() {
     } finally {
       setBusy(false);
     }
+  }
+  function addAlert(rule: Omit<AlertRule, "id" | "createdAt" | "enabled">) {
+    setAlerts((current) => [
+      ...current,
+      {
+        ...rule,
+        id: globalThis.crypto?.randomUUID?.() ?? `alert-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        enabled: true,
+      },
+    ]);
+  }
+  function toggleAlert(id: string) {
+    setAlerts((current) =>
+      current.map((rule) =>
+        rule.id === id ? { ...rule, enabled: !rule.enabled } : rule,
+      ),
+    );
+  }
+  function removeAlert(id: string) {
+    setAlerts((current) => current.filter((rule) => rule.id !== id));
+    setAlertEvents((current) => current.filter((event) => event.ruleId !== id));
   }
   const selectedScenario = scenarios.find((s) => s.id === scenarioId) ?? scenarios[0];
   const scaleMultiplier = { pilot: 0.25, standard: 1, production: 5 }[workloadScale] ?? 1;
@@ -1156,6 +1261,7 @@ export default function Home() {
               ["history", "↗", "Price history"],
               ["health", "●", "Data health"],
               ["brief", "≡", "Market brief"],
+              ["alerts", "!", "Price alerts"],
               ["recommend", "◇", "Recommendations"],
             ].map((x) => (
               <button
@@ -1166,6 +1272,7 @@ export default function Home() {
                 <span>{x[1]}</span>
                 {x[2]}
                 {x[0] === "brief" && <i>3</i>}
+                {x[0] === "alerts" && alertEvents.length > 0 && <i>{alertEvents.length}</i>}
               </button>
             ))}
           </div>
@@ -1363,13 +1470,39 @@ export default function Home() {
                 title="What changed across AI providers"
                 sub="Pricing, regional availability, quotas, and service changes in one concise view."
               />
-              {liveBriefs.map((b, i) => (
+              <div className="briefFilters">
+                <Filter
+                  label="Category"
+                  value={briefCategory}
+                  set={setBriefCategory}
+                  options={[
+                    "all|All changes",
+                    "pricing|Pricing",
+                    "availability|Availability",
+                    "routing|Routing",
+                  ]}
+                />
+                <Filter
+                  label="Materiality"
+                  value={briefSeverity}
+                  set={setBriefSeverity}
+                  options={[
+                    "all|All levels",
+                    "high|High impact",
+                    "medium|Medium impact",
+                    "low|Low impact",
+                  ]}
+                />
+              </div>
+              {filteredBriefs.map((b, i) => (
                 <article
                   key={b.title}
                   className={openBrief === i ? "expanded" : ""}
                 >
                   <small>
                     {b.time}　<b>{b.tag}</b>
+                    <em className={b.severity}>{b.severity} impact</em>
+                    <span>{b.region}</span>
                   </small>
                   <h3>{b.title}</h3>
                   <p>{b.text}</p>
@@ -1384,14 +1517,19 @@ export default function Home() {
                     <div className="impact">
                       <b>Selection impact</b>
                       <p>{b.impact}</p>
+                      <div>
+                        {b.scenarios.map((scenario) => <span key={scenario}>{scenario}</span>)}
+                        {b.sourceUrl && <a href={b.sourceUrl} target="_blank" rel="noreferrer">Official source ↗</a>}
+                      </div>
                     </div>
                   )}
                 </article>
               ))}
+              {!filteredBriefs.length && <div className="empty">No market changes match these filters.</div>}
             </div>
             <aside>
               <h3>At a glance</h3>
-              <strong>{changes.length || 3}</strong>
+              <strong>{filteredBriefs.length}</strong>
               <span>
                 {changes.length
                   ? "live price changes"
@@ -1584,6 +1722,19 @@ export default function Home() {
             </div>
           </>
         )}
+        {tab === "alerts" && (
+          <AlertCenter
+            models={liveModels}
+            rules={alerts}
+            events={alertEvents}
+            onAdd={addAlert}
+            onToggle={toggleAlert}
+            onRemove={removeAlert}
+            onClearEvents={() => setAlertEvents([])}
+            onRefresh={refresh}
+            busy={busy}
+          />
+        )}
         {tab === "calculator" && (
           <CostCalculator
             models={liveModels}
@@ -1681,6 +1832,7 @@ function Header({ tab, setTab }: { tab: string; setTab: (v: string) => void }) {
           ["history", "History"],
           ["health", "Data health"],
           ["brief", "Market brief"],
+          ["alerts", "Alerts"],
           ["recommend", "API finder"],
         ].map((x) => (
           <button
@@ -1931,6 +2083,103 @@ function verificationLabel(status: VerificationStatus) {
     reference: "REFERENCE",
     quarantined: "QUARANTINED",
   }[status];
+}
+function AlertCenter({
+  models,
+  rules,
+  events,
+  onAdd,
+  onToggle,
+  onRemove,
+  onClearEvents,
+  onRefresh,
+  busy,
+}: {
+  models: M[];
+  rules: AlertRule[];
+  events: AlertEvent[];
+  onAdd: (rule: Omit<AlertRule, "id" | "createdAt" | "enabled">) => void;
+  onToggle: (id: string) => void;
+  onRemove: (id: string) => void;
+  onClearEvents: () => void;
+  onRefresh: () => void;
+  busy: boolean;
+}) {
+  const [model, setModel] = useState("all"),
+    [provider, setProvider] = useState("all"),
+    [direction, setDirection] = useState<AlertRule["direction"]>("either"),
+    [threshold, setThreshold] = useState(10);
+  const providers = [
+    ...new Set(
+      models
+        .filter((item) => model === "all" || item.name === model)
+        .flatMap((item) => item.providers.map((route) => route.name)),
+    ),
+  ];
+  function createRule() {
+    onAdd({ model, provider, direction, threshold: Math.max(0.1, threshold) });
+  }
+  return (
+    <div className="alertCenter">
+      <Title
+        label="MANUAL PRICE WATCH"
+        title="Get alerted when a refresh finds a material change"
+        sub="Rules are stored in this browser. They are evaluated only when you press Refresh prices; there is no automatic polling."
+      />
+      <div className="alertManual">
+        <div>
+          <small>REFRESH POLICY</small>
+          <strong>Manual only</strong>
+          <span>No background jobs, provider accounts, or API keys</span>
+        </div>
+        <button onClick={onRefresh} disabled={busy}>{busy ? "Checking sources…" : "↻ Refresh and evaluate alerts"}</button>
+      </div>
+      <div className="alertBuilder">
+        <Filter label="Model" value={model} set={(value) => { setModel(value); setProvider("all"); }} options={["all|Any model", ...models.map((item) => item.name)]} />
+        <Filter label="Provider" value={provider} set={setProvider} options={["all|Any provider", ...providers.map((item) => `${item}|${providerLabel(item)}`)]} />
+        <Filter label="Direction" value={direction} set={(value) => setDirection(value as AlertRule["direction"])} options={["either|Up or down", "up|Price increase", "down|Price decrease"]} />
+        <label>
+          Change threshold
+          <input type="number" min="0.1" step="0.5" value={threshold} onChange={(event) => setThreshold(+event.target.value)} />
+          <b>%</b>
+        </label>
+        <button onClick={createRule}>Add alert rule</button>
+      </div>
+      <div className="alertColumns">
+        <section>
+          <div className="alertSectionTitle"><b>ACTIVE RULES</b><span>{rules.filter((rule) => rule.enabled).length} enabled</span></div>
+          {rules.map((rule) => (
+            <article className={!rule.enabled ? "disabled" : ""} key={rule.id}>
+              <button className="alertToggle" onClick={() => onToggle(rule.id)} aria-label={`${rule.enabled ? "Disable" : "Enable"} alert`}><i /></button>
+              <div>
+                <strong>{rule.model === "all" ? "Any model" : rule.model}</strong>
+                <span>{rule.provider === "all" ? "Any provider" : providerLabel(rule.provider)}</span>
+              </div>
+              <b>{rule.direction === "either" ? "±" : rule.direction === "up" ? "↑" : "↓"}{rule.threshold}%</b>
+              <small>Created {new Date(rule.createdAt).toLocaleDateString("en-US")}</small>
+              <button className="alertRemove" onClick={() => onRemove(rule.id)}>Remove</button>
+            </article>
+          ))}
+          {!rules.length && <div className="alertEmpty">No rules yet. Create one above.</div>}
+        </section>
+        <section>
+          <div className="alertSectionTitle"><b>TRIGGERED EVENTS</b>{events.length > 0 && <button onClick={onClearEvents}>Clear</button>}</div>
+          {events.map((event) => (
+            <article className="event" key={event.id}>
+              <em className={event.change.direction}>{event.change.direction === "up" ? "↑" : "↓"}</em>
+              <div>
+                <strong>{event.change.model}</strong>
+                <span>{providerLabel(event.change.provider)} · {fieldName(event.change.field)}</span>
+              </div>
+              <b>{event.change.percent > 0 ? "+" : ""}{event.change.percent.toFixed(1)}%</b>
+              <small>{new Date(event.triggeredAt).toLocaleString("en-US")}</small>
+            </article>
+          ))}
+          {!events.length && <div className="alertEmpty">No rule has triggered on a manual refresh.</div>}
+        </section>
+      </div>
+    </div>
+  );
 }
 function CostCalculator({
   models,
@@ -2229,11 +2478,48 @@ function HistoryView({
 }) {
   const models = [...new Set(snapshots.map((s) => s.model))];
   const [model, setModel] = useState("all"),
-    [field, setField] = useState<"input" | "cached" | "output">("input");
-  const visible = snapshots.filter((s) => model === "all" || s.model === model);
+    [field, setField] = useState<"input" | "cached" | "output">("input"),
+    [range, setRange] = useState("30"),
+    [asOf] = useState(() => Date.now());
+  const cutoff = range === "all" ? 0 : asOf - Number(range) * 86_400_000;
+  const visible = snapshots.filter(
+    (s) =>
+      (model === "all" || s.model === model) &&
+      new Date(s.collectedAt).getTime() >= cutoff,
+  );
   const routes = [
     ...new Set(visible.map((s) => `${s.model}|||${s.provider}`)),
   ].slice(0, 8);
+  const movements = visible.filter((snapshot) => snapshot.changePercent != null);
+  const largestUp = movements.reduce<HistorySnapshot | null>(
+    (best, item) => !best || (item.changePercent ?? 0) > (best.changePercent ?? 0) ? item : best,
+    null,
+  );
+  const largestDown = movements.reduce<HistorySnapshot | null>(
+    (best, item) => !best || (item.changePercent ?? 0) < (best.changePercent ?? 0) ? item : best,
+    null,
+  );
+  function exportHistory() {
+    const header = "collected_at,model,provider,input,cache_read,output,currency,pricing_region,tier,change_percent,verification_status";
+    const rows = visible.map((snapshot) => [
+      snapshot.collectedAt,
+      snapshot.model,
+      providerLabel(snapshot.provider),
+      snapshot.input ?? "",
+      snapshot.cached ?? "",
+      snapshot.output ?? "",
+      snapshot.currency ?? "USD",
+      snapshot.pricingRegion ?? "",
+      snapshot.tier ?? "",
+      snapshot.changePercent ?? "",
+      snapshot.verificationStatus ?? "",
+    ].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","));
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([[header, ...rows].join("\n")], { type: "text/csv" }));
+    link.download = `modelscope-price-history-${range}d.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
   return (
     <div className="historyView">
       <Title
@@ -2262,10 +2548,23 @@ function HistoryView({
                 "output|Output",
               ]}
             />
+            <Filter
+              label="Range"
+              value={range}
+              set={setRange}
+              options={["7|7 days", "30|30 days", "90|90 days", "all|All history"]}
+            />
             <span>
-              {snapshots.length} accepted snapshots · {runs.length} recent
+              {visible.length} accepted snapshots · {runs.length} recent
               collection runs
             </span>
+            <button onClick={exportHistory} disabled={!visible.length}>Export CSV</button>
+          </div>
+          <div className="historySummary">
+            <div><small>ROUTES TRACKED</small><strong>{routes.length}</strong><span>in the selected view</span></div>
+            <div><small>LARGEST INCREASE</small><strong>{largestUp?.changePercent != null ? `+${largestUp.changePercent.toFixed(1)}%` : "—"}</strong><span>{largestUp ? `${largestUp.model} · ${providerLabel(largestUp.provider)}` : "No movement"}</span></div>
+            <div><small>LARGEST DECREASE</small><strong>{largestDown?.changePercent != null && largestDown.changePercent < 0 ? `${largestDown.changePercent.toFixed(1)}%` : "—"}</strong><span>{largestDown && (largestDown.changePercent ?? 0) < 0 ? `${largestDown.model} · ${providerLabel(largestDown.provider)}` : "No decrease"}</span></div>
+            <p>Accepted snapshots only. The view excludes quarantined anomalies and uses the first and latest recorded values for each displayed trend.</p>
           </div>
           <div className="trendGrid">
             {routes.map((key) => {

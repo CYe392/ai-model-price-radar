@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.5.0 — History, alerts, and Market Brief 2.0
+
+- Added 7-day, 30-day, 90-day, and all-history views with route trends, largest moves, accepted-snapshot counts, and CSV export.
+- Added browser-local price alert rules for model, provider, direction, and percentage threshold.
+- Kept alerts manual-only: rules are evaluated solely after the user presses Refresh prices, with no background polling.
+- Added triggered-event history, enable/disable controls, rule removal, and local persistence without provider accounts.
+- Added Market Brief category and materiality filters, regional scope, affected scenarios, official source links, and richer impact analysis.
+
 ## v1.4.0 — Recommendation Engine 2.0
 
 - Added scenario-first discovery for everyday chat, light/medium development, intensive development, OpenClaw and agent automation, customer support, and long-context RAG.

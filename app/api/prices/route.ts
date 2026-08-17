@@ -9,7 +9,7 @@ type AdapterResult = { source: SourceStatus; updates: PriceUpdate[] };
 type PriceChange = { model:string;provider:string;field:string;before:number;after:number;percent:number;direction:"up"|"down" };
 
 const TARGETS = [
-  { match: ["deepseek-v3.2", "deepseek/v3.2"], model: "DeepSeek V3.2" },
+  { match: ["deepseek-v4-flash", "deepseek/v4-flash"], model: "DeepSeek V4 Flash" },
   { match: ["qwen3.7-plus", "qwen/qwen3.7-plus"], model: "Qwen3.7 Plus" },
   { match: ["gemini-2.5-flash", "google/gemini-2.5-flash"], model: "Gemini 2.5 Flash" },
   { match: ["gpt-5-mini", "openai/gpt-5-mini"], model: "GPT-5 mini" },
@@ -106,10 +106,28 @@ function googlePrices(text:string):PriceUpdate[]{
 }
 function deepseekPrices(text:string):PriceUpdate[]{
   const block=section(text,"deepseek-v4-flash","Deduction Rules",2200);
-  const hit=block.match(/CACHE HIT[^$]{0,100}\$\s*([0-9.]+)/i)?.[1];
-  const miss=block.match(/CACHE MISS[^$]{0,100}\$\s*([0-9.]+)/i)?.[1];
-  const output=block.match(/OUTPUT TOKENS[^$]{0,100}\$\s*([0-9.]+)/i)?.[1];
-  return hit&&miss&&output?[{model:"DeepSeek V3.2",provider:"DeepSeek 官方",input:+miss,cached:+hit,output:+output,source:"deepseek"}]:[];
+  const hit=moneyList(section(block,"CACHE HIT","CACHE MISS",500));
+  const miss=moneyList(section(block,"CACHE MISS","OUTPUT TOKENS",500));
+  const output=moneyList(section(block,"OUTPUT TOKENS","Concurrency Limit",500));
+  const hour=new Date().getUTCHours();
+  const peak=(hour>=1&&hour<4)||(hour>=6&&hour<10);
+  const i=peak?2:0;
+  return hit[i]!=null&&miss[i]!=null&&output[i]!=null?[{model:"DeepSeek V4 Flash",provider:"DeepSeek 官方",input:miss[i],cached:hit[i],output:output[i],source:"deepseek",currency:"USD",nativeInput:miss[i],nativeOutput:output[i],listInput:miss[2]??miss[i],listOutput:output[2]??output[i],discountPercent:peak?0:50,pricingRegion:"全球",tier:peak?"PEAK · 01:00–04:00 / 06:00–10:00 UTC":"OFF-PEAK · 峰值时段外"}]:[];
+}
+
+async function deepseekPage():Promise<AdapterResult>{
+  const id="deepseek",name="DeepSeek",primary="https://api-docs.deepseek.com/quick_start/pricing",fallback="https://api-docs.deepseek.com/quick_start/pricing/?article_id=article_1779470751466_8";
+  try{
+    for(const [url,label] of [[primary,"主定价页"],[fallback,"官方文章快照"]] as const){
+      const response=await fetchWithTimeout(url);
+      if(response.status===403||response.status===429)continue;
+      if(!response.ok)continue;
+      const text=textOnly(await response.text());
+      const updates=deepseekPrices(text);
+      if(updates.length){const tier=updates[0].tier?.startsWith("PEAK")?"峰值价":"谷时价";return{source:status(id,name,url,"ok",`成功解析${label}；当前按 UTC 时段采用${tier}，主页面与备用页面自动切换`,updates.length),updates}}
+    }
+    return{source:status(id,name,primary,"changed","主定价页与官方备用页面均缺少完整价格字段，已停止写入"),updates:[]};
+  }catch(error){return{source:status(id,name,primary,"error",error instanceof Error?error.message:"抓取失败"),updates:[]}}
 }
 function qwenPrices(text:string,fxRate=7.2,fxAsOf="reference"):PriceUpdate[]{
   const at=text.toLowerCase().indexOf("qwen3.7-plus");
@@ -171,7 +189,7 @@ export async function GET() {
     publicPage("openai","OpenAI","https://openai.com/api/pricing/",["cached input","input","output","gpt-5"]),
     pricedPage("anthropic","Anthropic","https://platform.claude.com/docs/en/about-claude/pricing",["Base Input Tokens","Cache Hits & Refreshes","Claude Sonnet 4"],anthropicPrices),
     pricedPage("google","Google AI","https://ai.google.dev/gemini-api/docs/pricing",["Input price","Gemini 2.5 Flash","Context caching price"],googlePrices),
-    pricedPage("deepseek","DeepSeek","https://api-docs.deepseek.com/quick_start/pricing",["deepseek-v4-flash","CACHE HIT","CACHE MISS"],deepseekPrices),
+    deepseekPage(),
     qwenPage(),
   ]);
   const results = adapters.map((r,i) => r.status === "fulfilled" ? r.value : { source: status(`adapter-${i}`,"未知来源","","error",String(r.reason)), updates: [] });

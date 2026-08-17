@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.0 — Region, availability, and compliance
+
+- Replaced broad regional buckets with explicit US, Canada, EU, UK, Mainland China, Hong Kong, Singapore, Japan, and Australia views.
+- Distinguished account registration, purchasing, in-region deployment, and documented data residency.
+- Added GDPR, Zero Data Retention, SLA, no-training, and regional-processing filters with unavailable-route explanations.
+- Added route model IDs, residency and retention context, policy badges, and official policy links.
+- Split Qwen 3.7 Plus into China, international, and US routes with their regional model IDs and public list prices.
+- Added USD, EUR, GBP, CNY, JPY, and AUD planning currency views across comparison, recommendation, calculator, and CSV exports.
+
 ## 1.2.0 — Complete Cost Engine
 
 - Added Standard, Batch, Flex, and Priority pricing assumptions with explicit multipliers.

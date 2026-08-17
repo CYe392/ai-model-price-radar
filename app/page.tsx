@@ -1,7 +1,27 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, no-irregular-whitespace, jsx-a11y/anchor-is-valid */
 "use client";
 import { useEffect, useMemo, useState } from "react";
-type Region = "全球" | "中国大陆" | "北美" | "欧洲" | "亚太";
+type Region =
+  | "全球"
+  | "美国"
+  | "加拿大"
+  | "欧盟"
+  | "英国"
+  | "中国大陆"
+  | "香港"
+  | "新加坡"
+  | "日本"
+  | "澳大利亚";
+type LegacyRegion = "北美" | "欧洲" | "亚太";
+type Currency = "USD" | "EUR" | "GBP" | "CNY" | "JPY" | "AUD";
+type AvailabilityStage = "register" | "purchase" | "deploy" | "residency";
+type ComplianceFilter =
+  | "all"
+  | "gdpr"
+  | "zdr"
+  | "sla"
+  | "no_training"
+  | "regional_processing";
 type P = {
   name: string;
   input: number;
@@ -9,7 +29,7 @@ type P = {
   write?: number;
   output: number;
   latency: number;
-  regions: Region[];
+  regions: (Region | LegacyRegion)[];
   tag?: string;
   color: string;
   plan?: string;
@@ -28,6 +48,35 @@ type P = {
   sourceUrl?: string;
   parserVersion?: string;
   verificationStatus?: VerificationStatus;
+  modelId?: string;
+  registrationRegions?: Region[];
+  purchaseRegions?: Region[];
+  deploymentRegions?: Region[];
+  dataResidencyRegions?: Region[];
+  complianceSource?: string;
+  availabilityNote?: string;
+  zdr?: boolean;
+  gdpr?: boolean;
+  sla?: boolean;
+  noTraining?: boolean;
+  regionalProcessing?: boolean;
+};
+type RoutePolicy = {
+  registration: Region[];
+  purchase: Region[];
+  deploy: Region[];
+  residency: Region[];
+  modelId: string;
+  residencyLabel: string;
+  retentionLabel: string;
+  trainingLabel: string;
+  zdr: boolean;
+  gdpr: boolean;
+  sla: boolean;
+  noTraining: boolean;
+  regionalProcessing: boolean;
+  note: string;
+  source?: string;
 };
 type VerificationStatus =
   | "verified"
@@ -317,12 +366,66 @@ const models: M[] = [
     providers: [
       {
         name: "阿里云百炼",
-        input: 0.28,
-        cached: 0.056,
-        output: 1.12,
+        input: 0.276,
+        cached: 0.055,
+        output: 1.101,
         latency: 520,
-        regions: ["全球", "中国大陆", "北美", "亚太"],
-        tag: "地区阶梯价",
+        regions: ["中国大陆"],
+        registrationRegions: ["中国大陆"],
+        purchaseRegions: ["中国大陆"],
+        deploymentRegions: ["中国大陆"],
+        dataResidencyRegions: ["中国大陆"],
+        modelId: "qwen3.7-plus",
+        pricingRegion: "China (Beijing)",
+        sourceUrl: "https://www.alibabacloud.com/help/en/model-studio/model-pricing",
+        complianceSource: "https://www.alibabacloud.com/help/en/model-studio/models",
+        availabilityNote: "Chinese-mainland service scope; Beijing endpoint and API key.",
+        noTraining: true,
+        regionalProcessing: true,
+        tag: "中国区价格",
+        color: "orange",
+      },
+      {
+        name: "Alibaba Cloud · International",
+        input: 0.4,
+        cached: 0.08,
+        output: 1.6,
+        latency: 570,
+        regions: ["香港", "新加坡", "欧盟", "英国", "日本", "澳大利亚"],
+        registrationRegions: ["香港", "新加坡", "欧盟", "英国", "日本", "澳大利亚", "加拿大"],
+        purchaseRegions: ["香港", "新加坡", "欧盟", "英国", "日本", "澳大利亚", "加拿大"],
+        deploymentRegions: ["香港", "新加坡", "欧盟", "日本"],
+        dataResidencyRegions: ["香港", "新加坡", "欧盟", "日本"],
+        modelId: "qwen3.7-plus",
+        pricingRegion: "Singapore / regional endpoints",
+        sourceUrl: "https://www.alibabacloud.com/help/en/model-studio/model-pricing",
+        complianceSource: "https://www.alibabacloud.com/help/en/model-studio/models",
+        availabilityNote: "Regional endpoints, API keys, supported models, and prices are not interchangeable.",
+        gdpr: true,
+        noTraining: true,
+        regionalProcessing: true,
+        tag: "国际区价格",
+        color: "orange",
+      },
+      {
+        name: "Alibaba Cloud · US",
+        input: 0.4,
+        cached: 0.08,
+        output: 1.6,
+        latency: 545,
+        regions: ["美国", "加拿大"],
+        registrationRegions: ["美国", "加拿大"],
+        purchaseRegions: ["美国", "加拿大"],
+        deploymentRegions: ["美国"],
+        dataResidencyRegions: ["美国"],
+        modelId: "qwen3.7-plus-us",
+        pricingRegion: "US (Virginia)",
+        sourceUrl: "https://www.alibabacloud.com/help/en/model-studio/model-pricing",
+        complianceSource: "https://www.alibabacloud.com/help/en/model-studio/models",
+        availabilityNote: "US service scope uses a US model ID and Virginia endpoint.",
+        noTraining: true,
+        regionalProcessing: true,
+        tag: "美国区价格",
         color: "orange",
       },
       {
@@ -509,13 +612,185 @@ const scenarios = [
     desc: "High-volume summarization, classification, and extraction",
   },
 ];
-const regionOptions: Region[] = ["全球", "中国大陆", "北美", "欧洲", "亚太"];
+const regionOptions: Region[] = [
+  "全球",
+  "美国",
+  "加拿大",
+  "欧盟",
+  "英国",
+  "中国大陆",
+  "香港",
+  "新加坡",
+  "日本",
+  "澳大利亚",
+];
+const marketRegions = regionOptions.filter((r) => r !== "全球");
+const currencyRates: Record<Currency, number> = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  CNY: 7.18,
+  JPY: 147,
+  AUD: 1.54,
+};
+function uniqueRegions(regions: Region[]) {
+  return [...new Set(regions)];
+}
+function expandRegions(regions: (Region | LegacyRegion)[]) {
+  const expanded: Region[] = [];
+  for (const region of regions) {
+    if (region === "全球")
+      expanded.push("美国", "加拿大", "欧盟", "英国", "香港", "新加坡", "日本", "澳大利亚");
+    else if (region === "北美") expanded.push("美国", "加拿大");
+    else if (region === "欧洲") expanded.push("欧盟", "英国");
+    else if (region === "亚太") expanded.push("香港", "新加坡", "日本", "澳大利亚");
+    else expanded.push(region);
+  }
+  return uniqueRegions(expanded);
+}
+function routePolicy(p: P): RoutePolicy {
+  const provider = p.name;
+  const base = expandRegions(p.regions);
+  let registration = p.registrationRegions ?? base;
+  let purchase = p.purchaseRegions ?? registration;
+  let deploy = p.deploymentRegions ?? base;
+  let residency = p.dataResidencyRegions ?? [];
+  let zdr = p.zdr ?? false;
+  let gdpr = p.gdpr ?? false;
+  let sla = p.sla ?? p.tag === "企业 SLA";
+  let noTraining = p.noTraining ?? false;
+  let regionalProcessing = p.regionalProcessing ?? false;
+  let retentionLabel = "Verify retention in provider terms";
+  let trainingLabel = noTraining ? "API data not used for training" : "Verify training policy";
+  let note = p.availabilityNote ?? "Availability can depend on account, model access, and provider terms.";
+  let source = p.complianceSource ?? p.sourceUrl;
+
+  if (provider === "OpenAI 官方") {
+    registration = marketRegions.filter((r) => r !== "中国大陆");
+    purchase = registration;
+    deploy = ["美国", "欧盟"];
+    residency = ["美国", "加拿大", "欧盟", "英国", "新加坡", "日本", "澳大利亚"];
+    zdr = true;
+    gdpr = true;
+    noTraining = true;
+    regionalProcessing = true;
+    retentionLabel = "ZDR is approval- and endpoint-dependent";
+    trainingLabel = "API data not used for training by default";
+    note = "Non-US residency requires eligible controls; only documented regions support regional processing.";
+    source = "https://platform.openai.com/docs/models/default-usage-policies-by-endpoint";
+  } else if (provider === "AWS Bedrock") {
+    registration = marketRegions.filter((r) => r !== "中国大陆");
+    purchase = registration;
+    deploy = ["美国", "加拿大", "欧盟", "英国", "新加坡", "日本", "澳大利亚"];
+    residency = deploy;
+    gdpr = true;
+    sla = true;
+    noTraining = true;
+    regionalProcessing = true;
+    retentionLabel = "In-Region, geographic, and global routing differ";
+    trainingLabel = "Bedrock service data protection applies";
+    note = "Choose In-Region for a single region or geographic routing to stay within a documented geography.";
+    source = "https://docs.aws.amazon.com/bedrock/latest/userguide/models-region-compatibility.html";
+  } else if (provider === "Azure AI") {
+    registration = marketRegions.filter((r) => r !== "中国大陆");
+    purchase = registration;
+    deploy = ["美国", "加拿大", "欧盟", "英国", "香港", "新加坡", "日本", "澳大利亚"];
+    residency = deploy;
+    gdpr = true;
+    sla = true;
+    noTraining = true;
+    regionalProcessing = true;
+    retentionLabel = "Deployment and abuse-monitoring controls vary by service";
+    trainingLabel = "Customer prompts are not used to train base models";
+    note = "Select a regional deployment and confirm the specific Azure model/SKU is offered there.";
+  } else if (provider === "OpenRouter") {
+    registration = marketRegions.filter((r) => r !== "中国大陆");
+    purchase = registration;
+    deploy = registration;
+    residency = [];
+    zdr = true;
+    gdpr = true;
+    noTraining = true;
+    retentionLabel = "ZDR depends on the selected upstream route";
+    trainingLabel = "Route-level data policy must be checked";
+    note = "Router access does not guarantee upstream data residency; enable a compatible ZDR route when required.";
+  } else if (["Together AI", "Fireworks AI", "OpenCode Go"].includes(provider)) {
+    registration = marketRegions.filter((r) => r !== "中国大陆");
+    purchase = registration;
+    deploy = registration;
+    gdpr = true;
+    noTraining = true;
+    retentionLabel = "Retention depends on product tier and route";
+    trainingLabel = "Provider API policy applies";
+  } else if (provider.includes("Alibaba Cloud") || provider === "阿里云百炼") {
+    retentionLabel = "Regional endpoint and workspace controls apply";
+    trainingLabel = noTraining ? "Provider API policy applies" : trainingLabel;
+    source = p.complianceSource ?? "https://www.alibabacloud.com/help/en/model-studio/models";
+  } else if (provider === "DeepSeek 官方" || provider === "SiliconFlow") {
+    registration = uniqueRegions([...base, "中国大陆"]);
+    purchase = registration;
+    deploy = registration;
+    residency = base.includes("中国大陆") ? ["中国大陆"] : [];
+    noTraining = p.noTraining ?? false;
+    retentionLabel = "Confirm retention and cross-border processing in provider terms";
+  }
+
+  return {
+    registration: uniqueRegions(registration),
+    purchase: uniqueRegions(purchase),
+    deploy: uniqueRegions(deploy),
+    residency: uniqueRegions(residency),
+    modelId: p.modelId ?? provider.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    residencyLabel: residency.length ? residency.map(regionLabel).join(" / ") : "Provider-controlled / not documented",
+    retentionLabel,
+    trainingLabel,
+    zdr,
+    gdpr,
+    sla,
+    noTraining,
+    regionalProcessing,
+    note,
+    source,
+  };
+}
+function routeAvailable(p: P, region: Region, stage: AvailabilityStage) {
+  if (region === "全球") return true;
+  return routePolicy(p)[stage].includes(region);
+}
+function routeMatchesCompliance(p: P, filter: ComplianceFilter) {
+  if (filter === "all") return true;
+  const policy = routePolicy(p);
+  if (filter === "no_training") return policy.noTraining;
+  if (filter === "regional_processing") return policy.regionalProcessing;
+  return policy[filter];
+}
+function unavailableReason(p: P, region: Region, stage: AvailabilityStage) {
+  if (region === "全球" || routeAvailable(p, region, stage)) return "";
+  const labels: Record<AvailabilityStage, string> = {
+    register: "Account registration is not documented",
+    purchase: "Purchase access is not documented",
+    deploy: "No documented deployment in this region",
+    residency: "No documented in-region data residency",
+  };
+  return `${labels[stage]} for ${regionLabel(region)}.`;
+}
+function formatMoney(value: number, currency: Currency, digits = 3) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: currency === "JPY" ? 0 : 2,
+    maximumFractionDigits: currency === "JPY" ? 2 : digits,
+  }).format(value * currencyRates[currency]);
+}
 export default function Home() {
   const [tab, setTab] = useState("prices"),
     [q, setQ] = useState(""),
     [sort, setSort] = useState("input"),
     [region, setRegion] = useState<Region>("全球"),
     [priority, setPriority] = useState("balanced"),
+    [availabilityStage, setAvailabilityStage] = useState<AvailabilityStage>("purchase"),
+    [compliance, setCompliance] = useState<ComplianceFilter>("all"),
+    [currency, setCurrency] = useState<Currency>("USD"),
     [busy, setBusy] = useState(false),
     [updated, setUpdated] = useState("Not refreshed yet"),
     [toast, setToast] = useState(false),
@@ -559,9 +834,8 @@ export default function Home() {
       .finally(() => setHistoryBusy(false));
   }, [tab, historyLoaded]);
   const available = (p: P) =>
-    region === "全球"
-      ? p.regions.includes("全球") || p.regions.length > 1
-      : p.regions.includes(region) || p.regions.includes("全球");
+    routeAvailable(p, region, availabilityStage) &&
+    routeMatchesCompliance(p, compliance);
   const liveModels = useMemo(
     () =>
       models.map((m) => ({
@@ -618,8 +892,23 @@ export default function Home() {
                 ),
               ),
         ),
-    [q, sort, region, liveModels],
+    [q, sort, region, availabilityStage, compliance, liveModels],
   );
+  const allRouteCount = liveModels.reduce((sum, m) => sum + m.providers.length, 0);
+  const availableRouteCount = liveModels.reduce(
+    (sum, m) => sum + m.providers.filter(available).length,
+    0,
+  );
+  const exclusionReasons = liveModels
+    .flatMap((m) => m.providers)
+    .filter((p) => !available(p))
+    .reduce<Record<string, number>>((counts, p) => {
+      const reason =
+        unavailableReason(p, region, availabilityStage) ||
+        `Does not satisfy the ${complianceLabel(compliance)} requirement.`;
+      counts[reason] = (counts[reason] ?? 0) + 1;
+      return counts;
+    }, {});
   const liveBriefs = changes.length
     ? changes
         .slice(0, 8)
@@ -741,6 +1030,30 @@ export default function Home() {
                 options={regionOptions.map((r) => `${r}|${regionLabel(r)}`)}
               />
               <Filter
+                label="Availability"
+                value={availabilityStage}
+                set={(v) => setAvailabilityStage(v as AvailabilityStage)}
+                options={[
+                  "register|Can register",
+                  "purchase|Can purchase",
+                  "deploy|Can deploy in-region",
+                  "residency|Data resides in-region",
+                ]}
+              />
+              <Filter
+                label="Compliance"
+                value={compliance}
+                set={(v) => setCompliance(v as ComplianceFilter)}
+                options={[
+                  "all|All routes",
+                  "gdpr|GDPR support",
+                  "zdr|ZDR option",
+                  "sla|Published SLA",
+                  "no_training|No API training",
+                  "regional_processing|Regional processing",
+                ]}
+              />
+              <Filter
                 label="Sort by"
                 value={sort}
                 set={setSort}
@@ -751,7 +1064,35 @@ export default function Home() {
                   "name|Model name",
                 ]}
               />
-              <small>USD per 1M tokens</small>
+              <Filter
+                label="Currency"
+                value={currency}
+                set={(v) => setCurrency(v as Currency)}
+                options={["USD", "EUR", "GBP", "CNY", "JPY", "AUD"]}
+              />
+              <small>{currency} per 1M tokens · planning FX</small>
+            </div>
+            <div className="regionIntel">
+              <div>
+                <small>REGION VIEW</small>
+                <strong>{regionLabel(region)}</strong>
+                <span>{availabilityLabel(availabilityStage)}</span>
+              </div>
+              <div>
+                <small>ELIGIBLE ROUTES</small>
+                <strong>{availableRouteCount} / {allRouteCount}</strong>
+                <span>{complianceLabel(compliance)}</span>
+              </div>
+              <div className="exclusionSummary">
+                <small>WHY ROUTES ARE HIDDEN</small>
+                {Object.keys(exclusionReasons).length ? (
+                  Object.entries(exclusionReasons).slice(0, 3).map(([reason, count]) => (
+                    <span key={reason}><b>{count}</b> {reason}</span>
+                  ))
+                ) : (
+                  <span>All routes satisfy this view.</span>
+                )}
+              </div>
             </div>
             <div className="grid">
               {shown.map((m) => (
@@ -773,8 +1114,9 @@ export default function Home() {
                     <span>Output</span>
                     <span>Latency*</span>
                   </div>
-                  {m.providers.map((p, i) => (
-                    <div className="row five" key={p.name}>
+                  {m.providers.map((p, i) => {
+                    const policy = routePolicy(p);
+                    return <div className="row five" key={p.name}>
                       <div>
                         <b className={p.color}>{providerLabel(p.name)}</b>
                         {i ===
@@ -791,11 +1133,11 @@ export default function Home() {
                           )}
                         </em>
                       </div>
-                      <strong>${p.input.toFixed(3)}</strong>
+                      <strong>{formatMoney(p.input, currency, 4)}</strong>
                       <strong className="cache">
-                        {p.cached != null ? `$${p.cached.toFixed(4)}` : "—"}
+                        {p.cached != null ? formatMoney(p.cached, currency, 4) : "—"}
                       </strong>
-                      <strong>${p.output.toFixed(2)}</strong>
+                      <strong>{formatMoney(p.output, currency, 4)}</strong>
                       <span className="latency">
                         <i /> {p.latency}ms
                       </span>
@@ -812,11 +1154,22 @@ export default function Home() {
                             {freshness(p.verifiedAt)} · {ageLabel(p.verifiedAt)}
                           </b>
                         )}
-                        {p.write != null && <b>Write ${p.write}</b>}
+                        {p.write != null && <b>Write {formatMoney(p.write, currency, 4)}</b>}
                         {p.tag && <b>{tagLabel(p.tag)}</b>}
                       </small>
+                      <div className="policyBadges">
+                        <code>{policy.modelId}</code>
+                        <span>Residency: {policy.residencyLabel}</span>
+                        {policy.gdpr && <b>GDPR</b>}
+                        {policy.zdr && <b>ZDR option</b>}
+                        {policy.sla && <b>SLA</b>}
+                        {policy.noTraining && <b>No API training</b>}
+                        {policy.regionalProcessing && <b>Regional processing</b>}
+                        {policy.source && <a href={policy.source} target="_blank" rel="noreferrer">Policy source ↗</a>}
+                        <i>{policy.note}</i>
+                      </div>
                     </div>
-                  ))}
+                  })}
                 </article>
               ))}
             </div>
@@ -826,7 +1179,7 @@ export default function Home() {
             </div>
             {!shown.length && (
               <div className="empty">
-                No matching routes are available in this region.
+                No routes satisfy {availabilityLabel(availabilityStage).toLowerCase()} in {regionLabel(region)} with {complianceLabel(compliance).toLowerCase()}.
               </div>
             )}
           </>
@@ -907,8 +1260,38 @@ export default function Home() {
                   "ability|Best capability",
                 ]}
               />
+              <Filter
+                label="Availability"
+                value={availabilityStage}
+                set={(v) => setAvailabilityStage(v as AvailabilityStage)}
+                options={[
+                  "register|Can register",
+                  "purchase|Can purchase",
+                  "deploy|Can deploy in-region",
+                  "residency|Data resides in-region",
+                ]}
+              />
+              <Filter
+                label="Compliance"
+                value={compliance}
+                set={(v) => setCompliance(v as ComplianceFilter)}
+                options={[
+                  "all|All routes",
+                  "gdpr|GDPR support",
+                  "zdr|ZDR option",
+                  "sla|Published SLA",
+                  "no_training|No API training",
+                  "regional_processing|Regional processing",
+                ]}
+              />
+              <Filter
+                label="Currency"
+                value={currency}
+                set={(v) => setCurrency(v as Currency)}
+                options={["USD", "EUR", "GBP", "CNY", "JPY", "AUD"]}
+              />
               <span>
-                Only routes available in the selected region are ranked
+                Ranking applies region, access stage, and compliance together
               </span>
             </div>
             <div className="caseGrid">
@@ -934,12 +1317,11 @@ export default function Home() {
                     <div className="price">
                       <span>Input / cache read / output</span>
                       <b>
-                        ${r?.p.input} / ${r?.p.cached ?? "—"} / ${r?.p.output}
+                        {r ? `${formatMoney(r.p.input, currency, 4)} / ${r.p.cached != null ? formatMoney(r.p.cached, currency, 4) : "—"} / ${formatMoney(r.p.output, currency, 4)}` : "No eligible route"}
                       </b>
                     </div>
                     <p>
-                      Available in {regionLabel(region)}; ranked by model
-                      quality, route cost, cache pricing, and latency.
+                      {availabilityLabel(availabilityStage)} in {regionLabel(region)}; {complianceLabel(compliance).toLowerCase()}. Ranked by model quality, route cost, cache pricing, and latency.
                     </p>
                     <button onClick={() => setTab("prices")}>
                       Compare all available routes →
@@ -963,6 +1345,12 @@ export default function Home() {
             models={liveModels}
             region={region}
             setRegion={setRegion}
+            availabilityStage={availabilityStage}
+            setAvailabilityStage={setAvailabilityStage}
+            compliance={compliance}
+            setCompliance={setCompliance}
+            currency={currency}
+            setCurrency={setCurrency}
           />
         )}
         {tab === "history" && (
@@ -1304,10 +1692,22 @@ function CostCalculator({
   models,
   region,
   setRegion,
+  availabilityStage,
+  setAvailabilityStage,
+  compliance,
+  setCompliance,
+  currency,
+  setCurrency,
 }: {
   models: M[];
   region: Region;
   setRegion: (r: Region) => void;
+  availabilityStage: AvailabilityStage;
+  setAvailabilityStage: (stage: AvailabilityStage) => void;
+  compliance: ComplianceFilter;
+  setCompliance: (filter: ComplianceFilter) => void;
+  currency: Currency;
+  setCurrency: (currency: Currency) => void;
 }) {
   const [inputTokens, setInputTokens] = useState(100_000_000),
     [outputTokens, setOutputTokens] = useState(20_000_000),
@@ -1318,9 +1718,8 @@ function CostCalculator({
     [freeCredits, setFreeCredits] = useState(0),
     [extraMonthlyFee, setExtraMonthlyFee] = useState(0);
   const available = (p: P) =>
-    region === "全球"
-      ? p.regions.includes("全球") || p.regions.length > 1
-      : p.regions.includes(region) || p.regions.includes("全球");
+    routeAvailable(p, region, availabilityStage) &&
+    routeMatchesCompliance(p, compliance);
   const inputM = Math.max(0, inputTokens) / 1e6,
     outputM = Math.max(0, outputTokens) / 1e6,
     hit = Math.min(100, Math.max(0, hitRate)) / 100,
@@ -1375,9 +1774,9 @@ function CostCalculator({
     return { rate, total: afterCredits * (1 + Math.max(0, taxRate) / 100) };
   });
   function exportEstimate() {
-    const header = "model,provider,standard_input,cache_read,cache_write,output,fixed_fees,tax,monthly_total,annual_total";
+    const header = "model,provider,region,availability,compliance,currency,standard_input,cache_read,cache_write,output,fixed_fees,tax,monthly_total,annual_total";
     const rows = ranked.map((r) =>
-      [r.m.name, providerLabel(r.p.name), r.standard, r.cached, r.cacheWrite, r.output, r.planFee + Math.max(0, extraMonthlyFee), r.tax, r.total, r.total * 12]
+      [r.m.name, providerLabel(r.p.name), regionLabel(region), availabilityLabel(availabilityStage), complianceLabel(compliance), currency, r.standard * currencyRates[currency], r.cached * currencyRates[currency], r.cacheWrite * currencyRates[currency], r.output * currencyRates[currency], (r.planFee + Math.max(0, extraMonthlyFee)) * currencyRates[currency], r.tax * currencyRates[currency], r.total * currencyRates[currency], r.total * 12 * currencyRates[currency]]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
         .join(","),
     );
@@ -1443,6 +1842,17 @@ function CostCalculator({
           set={(v) => setRegion(v as Region)}
           options={regionOptions.map((r) => `${r}|${regionLabel(r)}`)}
         />
+        <Filter
+          label="Availability"
+          value={availabilityStage}
+          set={(v) => setAvailabilityStage(v as AvailabilityStage)}
+          options={[
+            "register|Can register",
+            "purchase|Can purchase",
+            "deploy|Can deploy in-region",
+            "residency|Data resides in-region",
+          ]}
+        />
       </div>
       <div className="calcInputs advanced">
         <label>
@@ -1455,11 +1865,11 @@ function CostCalculator({
           </select>
         </label>
         <label>
-          Free monthly credits
+          Free monthly credits (USD)
           <input type="number" min="0" step="1" value={freeCredits} onChange={(e) => setFreeCredits(+e.target.value)} />
         </label>
         <label>
-          Additional fixed fees
+          Additional fixed fees (USD)
           <input type="number" min="0" step="1" value={extraMonthlyFee} onChange={(e) => setExtraMonthlyFee(+e.target.value)} />
         </label>
         <label>
@@ -1467,6 +1877,25 @@ function CostCalculator({
           <input type="number" min="0" max="100" step="0.1" value={taxRate} onChange={(e) => setTaxRate(+e.target.value)} />
           <b>{taxRate}%</b>
         </label>
+        <Filter
+          label="Compliance"
+          value={compliance}
+          set={(v) => setCompliance(v as ComplianceFilter)}
+          options={[
+            "all|All routes",
+            "gdpr|GDPR support",
+            "zdr|ZDR option",
+            "sla|Published SLA",
+            "no_training|No API training",
+            "regional_processing|Regional processing",
+          ]}
+        />
+        <Filter
+          label="Currency"
+          value={currency}
+          set={(v) => setCurrency(v as Currency)}
+          options={["USD", "EUR", "GBP", "CNY", "JPY", "AUD"]}
+        />
         <button className="exportCost" onClick={exportEstimate}>Export CSV</button>
       </div>
       <div className="calcSummary">
@@ -1477,10 +1906,10 @@ function CostCalculator({
         </div>
         <div>
           <small>LOWEST ESTIMATE</small>
-          <strong>${best.toFixed(2)}</strong>
+          <strong>{formatMoney(best, currency, 2)}</strong>
           <span>
             {ranked[0]
-              ? `${ranked[0].m.name} · ${providerLabel(ranked[0].p.name)} · $${(best * 12).toFixed(2)}/year`
+              ? `${ranked[0].m.name} · ${providerLabel(ranked[0].p.name)} · ${formatMoney(best * 12, currency, 2)}/year`
               : "No route"}
           </span>
         </div>
@@ -1499,7 +1928,7 @@ function CostCalculator({
         {sensitivity.map((point) => (
           <span key={point.rate}>
             <small>{point.rate}% hit</small>
-            <strong>${point.total.toFixed(2)}</strong>
+            <strong>{formatMoney(point.total, currency, 2)}</strong>
             <i style={{ height: `${Math.max(8, best ? (point.total / Math.max(...sensitivity.map((x) => x.total), 1)) * 58 : 8)}px` }} />
           </span>
         ))}
@@ -1519,15 +1948,15 @@ function CostCalculator({
               <b>{r.m.name}</b>
               <small>
                 {providerLabel(r.p.name)} · {regionLabel(region)}
-                {r.planFee > 0 && ` · $${r.planFee}/mo plan`}
+                {r.planFee > 0 && ` · ${formatMoney(r.planFee, currency, 2)}/mo plan`}
               </small>
             </span>
-            <code>${r.standard.toFixed(2)}</code>
-            <code>${r.cached.toFixed(2)}</code>
-            <code>${r.cacheWrite.toFixed(2)}</code>
-            <code>${r.output.toFixed(2)}</code>
+            <code>{formatMoney(r.standard, currency, 2)}</code>
+            <code>{formatMoney(r.cached, currency, 2)}</code>
+            <code>{formatMoney(r.cacheWrite, currency, 2)}</code>
+            <code>{formatMoney(r.output, currency, 2)}</code>
             <strong>
-              ${r.total.toFixed(2)}
+              {formatMoney(r.total, currency, 2)}
               {i === 0 && <em>BEST</em>}
             </strong>
           </div>
@@ -1797,6 +2226,8 @@ function providerLabel(name: string) {
         "OpenAI 官方": "OpenAI Direct",
         "DeepSeek 官方": "DeepSeek Direct",
         阿里云百炼: "Alibaba Cloud Model Studio",
+        "Alibaba Cloud · International": "Alibaba Cloud · International",
+        "Alibaba Cloud · US": "Alibaba Cloud · US",
       } as Record<string, string>
     )[name] || name
   );
@@ -1806,7 +2237,15 @@ function regionLabel(region: string) {
     (
       {
         全球: "Global",
+        美国: "United States",
+        加拿大: "Canada",
+        欧盟: "European Union",
+        英国: "United Kingdom",
         中国大陆: "Mainland China",
+        香港: "Hong Kong",
+        新加坡: "Singapore",
+        日本: "Japan",
+        澳大利亚: "Australia",
         北美: "North America",
         欧洲: "Europe",
         亚太: "Asia Pacific",
@@ -1823,10 +2262,31 @@ function tagLabel(tag: string) {
         待官网刷新: "Awaiting official refresh",
         订阅额度: "Subscription allowance",
         地区阶梯价: "Regional tiers",
+        中国区价格: "China pricing",
+        国际区价格: "International pricing",
+        美国区价格: "US pricing",
         "省 2%": "Save 2%",
       } as Record<string, string>
     )[tag] || tag
   );
+}
+function availabilityLabel(stage: AvailabilityStage) {
+  return {
+    register: "Registration available",
+    purchase: "Purchase available",
+    deploy: "In-region deployment",
+    residency: "In-region data residency",
+  }[stage];
+}
+function complianceLabel(filter: ComplianceFilter) {
+  return {
+    all: "All compliance profiles",
+    gdpr: "GDPR support",
+    zdr: "Zero Data Retention option",
+    sla: "Published SLA",
+    no_training: "No API training",
+    regional_processing: "Regional processing",
+  }[filter];
 }
 function regionText(text: string) {
   return text.replace("中国大陆 · 华北2（北京）", "Mainland China · Beijing");

@@ -35,3 +35,7 @@ npm run lint
 The application uses React and vinext on Cloudflare Workers. Structured price snapshots, collection runs, and source-health checks are persisted in Cloudflare D1 through Drizzle ORM. Deployment configuration is stored in `.openai/hosting.json`.
 
 Price collection follows a public-pages-only policy: no authentication, no anti-bot bypass, and route changes above 50% are quarantined for review.
+
+## Releases
+
+See [CHANGELOG.md](CHANGELOG.md) for versioned product changes. Every phase is delivered as a tested GitHub release and an independently deployable production version.

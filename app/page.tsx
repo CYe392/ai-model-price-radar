@@ -1,107 +1,1750 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, no-irregular-whitespace, jsx-a11y/anchor-is-valid */
 "use client";
-import {useEffect,useMemo,useState} from "react";
-type Region="全球"|"中国大陆"|"北美"|"欧洲"|"亚太";
-type P={name:string;input:number;cached?:number;write?:number;output:number;latency:number;regions:Region[];tag?:string;color:string;plan?:string;tier?:string;currency?:string;nativeInput?:number;nativeOutput?:number;listInput?:number;listOutput?:number;discountPercent?:number;pricingRegion?:string;fxRate?:number;fxAsOf?:string;source?:string;verifiedAt?:string};
-type M={name:string;company:string;icon:string;context:string;ability:number;providers:P[]};
-type FetchSource={id:string;name:string;url:string;status:"ok"|"changed"|"blocked"|"error";detail:string;records:number};
-type PriceUpdate={model:string;provider:string;input?:number;cached?:number;write?:number;output?:number;source:string;tier?:string;currency?:string;nativeInput?:number;nativeOutput?:number;listInput?:number;listOutput?:number;discountPercent?:number;pricingRegion?:string;fxRate?:number;fxAsOf?:string};
-type PriceChange={model:string;provider:string;field:string;before:number;after:number;percent:number;direction:"up"|"down"};
-type HistorySnapshot={id:number;collectedAt:string;model:string;provider:string;source:string;input:number|null;cached:number|null;cacheWrite:number|null;output:number|null;currency:string|null;pricingRegion:string|null;tier:string|null;changePercent:number|null};
-type CollectionRun={id:number;collectedAt:string;sourceCount:number;okCount:number;updateCount:number;rejectedCount:number};
-type SourceCheck={id:number;checkedAt:string;sourceId:string;sourceName:string;url:string;status:"ok"|"changed"|"blocked"|"error";detail:string;records:number};
-const models:M[]=[
- {name:"Claude 4 Sonnet",company:"Anthropic",icon:"A",context:"200K",ability:98,providers:[{name:"Anthropic 官方",input:3,cached:.3,write:3.75,output:15,latency:820,regions:["全球","北美","欧洲","亚太"],color:"orange"},{name:"AWS Bedrock",input:3,cached:.3,write:3.75,output:15,latency:960,regions:["全球","北美","欧洲","亚太"],color:"yellow"},{name:"OpenRouter",input:3,cached:.3,output:15,latency:710,regions:["全球","北美","欧洲","亚太"],color:"purple"}]},
- {name:"GPT-5 mini",company:"OpenAI",icon:"◎",context:"400K",ability:91,providers:[{name:"OpenAI 官方",input:.25,cached:.025,output:2,latency:540,regions:["全球","北美","欧洲","亚太"],color:"green"},{name:"Azure AI",input:.28,cached:.028,output:2.1,latency:630,regions:["全球","北美","欧洲","亚太"],tag:"企业 SLA",color:"blue"},{name:"OpenRouter",input:.25,cached:.025,output:2,latency:580,regions:["全球","北美","欧洲","亚太"],color:"purple"}]},
- {name:"DeepSeek V4 Flash",company:"DeepSeek",icon:"D",context:"1M",ability:93,providers:[{name:"DeepSeek 官方",input:.22,cached:.007,output:.66,latency:690,regions:["全球","中国大陆","亚太"],tag:"峰谷计价",color:"orange"},{name:"SiliconFlow",input:.23,cached:.023,output:.37,latency:610,regions:["中国大陆","亚太"],tag:"待官网刷新",color:"blue"},{name:"OpenRouter",input:.26,cached:.026,output:.4,latency:570,regions:["全球","北美","欧洲","亚太"],color:"purple"},{name:"OpenCode Go",input:.14,cached:.0028,output:.28,latency:650,regions:["北美","欧洲","亚太"],tag:"订阅额度",plan:"$10/mo · usage allowance",color:"teal"},{name:"Together AI",input:.14,cached:.03,output:.28,latency:590,regions:["全球","北美","欧洲","亚太"],color:"pink"},{name:"Fireworks AI",input:.14,cached:.028,output:.28,latency:490,regions:["全球","北美","欧洲","亚太"],color:"pink"}]},
- {name:"DeepSeek V4 Pro",company:"DeepSeek",icon:"D+",context:"1M",ability:98,providers:[{name:"DeepSeek 官方",input:.66,cached:.022,output:1.98,latency:880,regions:["全球","中国大陆","亚太"],tag:"峰谷计价",color:"orange"},{name:"Together AI",input:1.74,cached:.20,output:3.48,latency:760,regions:["全球","北美","欧洲","亚太"],color:"pink"},{name:"Fireworks AI",input:1.74,cached:.145,output:3.48,latency:690,regions:["全球","北美","欧洲","亚太"],color:"pink"},{name:"OpenRouter",input:.66,cached:.02,output:1.98,latency:720,regions:["全球","北美","欧洲","亚太"],color:"purple"}]},
- {name:"Qwen3.7 Plus",company:"Alibaba Cloud",icon:"Q",context:"1M",ability:92,providers:[{name:"阿里云百炼",input:.28,cached:.056,output:1.12,latency:520,regions:["全球","中国大陆","北美","亚太"],tag:"地区阶梯价",color:"orange"},{name:"OpenCode Go",input:.4,cached:.04,write:.5,output:1.6,latency:610,regions:["北美","欧洲","亚太"],tag:"订阅额度",plan:"$10/mo · usage allowance",color:"teal"},{name:"OpenRouter",input:.42,cached:.05,output:1.68,latency:570,regions:["全球","北美","欧洲","亚太"],color:"purple"},{name:"Together AI",input:.32,output:1.28,latency:620,regions:["全球","北美","欧洲","亚太"],color:"pink"},{name:"Fireworks AI",input:.4,cached:.08,output:1.6,latency:510,regions:["全球","北美","欧洲","亚太"],color:"pink"}]},
- {name:"Gemini 2.5 Flash",company:"Google",icon:"✦",context:"1M",ability:88,providers:[{name:"Google AI",input:.3,cached:.03,output:2.5,latency:470,regions:["全球","北美","欧洲","亚太"],color:"blue"},{name:"OpenRouter",input:.29,cached:.029,output:2.45,latency:520,regions:["全球","北美","欧洲","亚太"],tag:"省 2%",color:"purple"}]},
- {name:"Kimi K2.6",company:"Moonshot AI",icon:"K",context:"256K",ability:94,providers:[{name:"Together AI",input:1.2,cached:.2,output:4.5,latency:720,regions:["全球","北美","欧洲","亚太"],color:"pink"},{name:"Fireworks AI",input:.95,cached:.16,output:4,latency:590,regions:["全球","北美","欧洲","亚太"],color:"pink"}]},
- {name:"GLM 5.2",company:"Z.ai",icon:"G",context:"512K",ability:95,providers:[{name:"Together AI",input:1.4,cached:.26,output:4.4,latency:780,regions:["全球","北美","欧洲","亚太"],color:"pink"},{name:"Fireworks AI",input:1.4,cached:.14,output:4.4,latency:650,regions:["全球","北美","欧洲","亚太"],color:"pink"}]},
- {name:"MiniMax M3",company:"MiniMax",icon:"M",context:"512K",ability:90,providers:[{name:"Fireworks AI",input:.3,cached:.06,output:1.2,latency:560,regions:["全球","北美","欧洲","亚太"],color:"pink"}]}
+import { useEffect, useMemo, useState } from "react";
+type Region = "全球" | "中国大陆" | "北美" | "欧洲" | "亚太";
+type P = {
+  name: string;
+  input: number;
+  cached?: number;
+  write?: number;
+  output: number;
+  latency: number;
+  regions: Region[];
+  tag?: string;
+  color: string;
+  plan?: string;
+  tier?: string;
+  currency?: string;
+  nativeInput?: number;
+  nativeOutput?: number;
+  listInput?: number;
+  listOutput?: number;
+  discountPercent?: number;
+  pricingRegion?: string;
+  fxRate?: number;
+  fxAsOf?: string;
+  source?: string;
+  verifiedAt?: string;
+  sourceUrl?: string;
+  parserVersion?: string;
+  verificationStatus?: VerificationStatus;
+};
+type VerificationStatus =
+  | "verified"
+  | "previously_verified"
+  | "reference"
+  | "quarantined";
+type M = {
+  name: string;
+  company: string;
+  icon: string;
+  context: string;
+  ability: number;
+  providers: P[];
+};
+type FetchSource = {
+  id: string;
+  name: string;
+  url: string;
+  status: "ok" | "changed" | "blocked" | "error";
+  detail: string;
+  records: number;
+};
+type PriceUpdate = {
+  model: string;
+  provider: string;
+  input?: number;
+  cached?: number;
+  write?: number;
+  output?: number;
+  source: string;
+  tier?: string;
+  currency?: string;
+  nativeInput?: number;
+  nativeOutput?: number;
+  listInput?: number;
+  listOutput?: number;
+  discountPercent?: number;
+  pricingRegion?: string;
+  fxRate?: number;
+  fxAsOf?: string;
+  sourceUrl?: string;
+  parserVersion?: string;
+  verificationStatus?: VerificationStatus;
+  verifiedAt?: string;
+};
+type PriceChange = {
+  model: string;
+  provider: string;
+  field: string;
+  before: number;
+  after: number;
+  percent: number;
+  direction: "up" | "down";
+};
+type HistorySnapshot = {
+  id: number;
+  collectedAt: string;
+  model: string;
+  provider: string;
+  source: string;
+  input: number | null;
+  cached: number | null;
+  cacheWrite: number | null;
+  output: number | null;
+  currency: string | null;
+  pricingRegion: string | null;
+  tier: string | null;
+  changePercent: number | null;
+  sourceUrl?: string | null;
+  parserVersion?: string | null;
+  verificationStatus?: VerificationStatus | null;
+  accepted?: boolean;
+};
+type CollectionRun = {
+  id: number;
+  collectedAt: string;
+  sourceCount: number;
+  okCount: number;
+  updateCount: number;
+  rejectedCount: number;
+};
+type SourceCheck = {
+  id: number;
+  checkedAt: string;
+  sourceId: string;
+  sourceName: string;
+  url: string;
+  status: "ok" | "changed" | "blocked" | "error";
+  detail: string;
+  records: number;
+};
+const models: M[] = [
+  {
+    name: "Claude 4 Sonnet",
+    company: "Anthropic",
+    icon: "A",
+    context: "200K",
+    ability: 98,
+    providers: [
+      {
+        name: "Anthropic 官方",
+        input: 3,
+        cached: 0.3,
+        write: 3.75,
+        output: 15,
+        latency: 820,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "orange",
+      },
+      {
+        name: "AWS Bedrock",
+        input: 3,
+        cached: 0.3,
+        write: 3.75,
+        output: 15,
+        latency: 960,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "yellow",
+      },
+      {
+        name: "OpenRouter",
+        input: 3,
+        cached: 0.3,
+        output: 15,
+        latency: 710,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "purple",
+      },
+    ],
+  },
+  {
+    name: "GPT-5 mini",
+    company: "OpenAI",
+    icon: "◎",
+    context: "400K",
+    ability: 91,
+    providers: [
+      {
+        name: "OpenAI 官方",
+        input: 0.25,
+        cached: 0.025,
+        output: 2,
+        latency: 540,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "green",
+      },
+      {
+        name: "Azure AI",
+        input: 0.28,
+        cached: 0.028,
+        output: 2.1,
+        latency: 630,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        tag: "企业 SLA",
+        color: "blue",
+      },
+      {
+        name: "OpenRouter",
+        input: 0.25,
+        cached: 0.025,
+        output: 2,
+        latency: 580,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "purple",
+      },
+    ],
+  },
+  {
+    name: "DeepSeek V4 Flash",
+    company: "DeepSeek",
+    icon: "D",
+    context: "1M",
+    ability: 93,
+    providers: [
+      {
+        name: "DeepSeek 官方",
+        input: 0.22,
+        cached: 0.007,
+        output: 0.66,
+        latency: 690,
+        regions: ["全球", "中国大陆", "亚太"],
+        tag: "峰谷计价",
+        color: "orange",
+      },
+      {
+        name: "SiliconFlow",
+        input: 0.23,
+        cached: 0.023,
+        output: 0.37,
+        latency: 610,
+        regions: ["中国大陆", "亚太"],
+        tag: "待官网刷新",
+        color: "blue",
+      },
+      {
+        name: "OpenRouter",
+        input: 0.26,
+        cached: 0.026,
+        output: 0.4,
+        latency: 570,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "purple",
+      },
+      {
+        name: "OpenCode Go",
+        input: 0.14,
+        cached: 0.0028,
+        output: 0.28,
+        latency: 650,
+        regions: ["北美", "欧洲", "亚太"],
+        tag: "订阅额度",
+        plan: "$10/mo · usage allowance",
+        color: "teal",
+      },
+      {
+        name: "Together AI",
+        input: 0.14,
+        cached: 0.03,
+        output: 0.28,
+        latency: 590,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+      {
+        name: "Fireworks AI",
+        input: 0.14,
+        cached: 0.028,
+        output: 0.28,
+        latency: 490,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+    ],
+  },
+  {
+    name: "DeepSeek V4 Pro",
+    company: "DeepSeek",
+    icon: "D+",
+    context: "1M",
+    ability: 98,
+    providers: [
+      {
+        name: "DeepSeek 官方",
+        input: 0.66,
+        cached: 0.022,
+        output: 1.98,
+        latency: 880,
+        regions: ["全球", "中国大陆", "亚太"],
+        tag: "峰谷计价",
+        color: "orange",
+      },
+      {
+        name: "Together AI",
+        input: 1.74,
+        cached: 0.2,
+        output: 3.48,
+        latency: 760,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+      {
+        name: "Fireworks AI",
+        input: 1.74,
+        cached: 0.145,
+        output: 3.48,
+        latency: 690,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+      {
+        name: "OpenRouter",
+        input: 0.66,
+        cached: 0.02,
+        output: 1.98,
+        latency: 720,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "purple",
+      },
+    ],
+  },
+  {
+    name: "Qwen3.7 Plus",
+    company: "Alibaba Cloud",
+    icon: "Q",
+    context: "1M",
+    ability: 92,
+    providers: [
+      {
+        name: "阿里云百炼",
+        input: 0.28,
+        cached: 0.056,
+        output: 1.12,
+        latency: 520,
+        regions: ["全球", "中国大陆", "北美", "亚太"],
+        tag: "地区阶梯价",
+        color: "orange",
+      },
+      {
+        name: "OpenCode Go",
+        input: 0.4,
+        cached: 0.04,
+        write: 0.5,
+        output: 1.6,
+        latency: 610,
+        regions: ["北美", "欧洲", "亚太"],
+        tag: "订阅额度",
+        plan: "$10/mo · usage allowance",
+        color: "teal",
+      },
+      {
+        name: "OpenRouter",
+        input: 0.42,
+        cached: 0.05,
+        output: 1.68,
+        latency: 570,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "purple",
+      },
+      {
+        name: "Together AI",
+        input: 0.32,
+        output: 1.28,
+        latency: 620,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+      {
+        name: "Fireworks AI",
+        input: 0.4,
+        cached: 0.08,
+        output: 1.6,
+        latency: 510,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+    ],
+  },
+  {
+    name: "Gemini 2.5 Flash",
+    company: "Google",
+    icon: "✦",
+    context: "1M",
+    ability: 88,
+    providers: [
+      {
+        name: "Google AI",
+        input: 0.3,
+        cached: 0.03,
+        output: 2.5,
+        latency: 470,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "blue",
+      },
+      {
+        name: "OpenRouter",
+        input: 0.29,
+        cached: 0.029,
+        output: 2.45,
+        latency: 520,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        tag: "省 2%",
+        color: "purple",
+      },
+    ],
+  },
+  {
+    name: "Kimi K2.6",
+    company: "Moonshot AI",
+    icon: "K",
+    context: "256K",
+    ability: 94,
+    providers: [
+      {
+        name: "Together AI",
+        input: 1.2,
+        cached: 0.2,
+        output: 4.5,
+        latency: 720,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+      {
+        name: "Fireworks AI",
+        input: 0.95,
+        cached: 0.16,
+        output: 4,
+        latency: 590,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+    ],
+  },
+  {
+    name: "GLM 5.2",
+    company: "Z.ai",
+    icon: "G",
+    context: "512K",
+    ability: 95,
+    providers: [
+      {
+        name: "Together AI",
+        input: 1.4,
+        cached: 0.26,
+        output: 4.4,
+        latency: 780,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+      {
+        name: "Fireworks AI",
+        input: 1.4,
+        cached: 0.14,
+        output: 4.4,
+        latency: 650,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+    ],
+  },
+  {
+    name: "MiniMax M3",
+    company: "MiniMax",
+    icon: "M",
+    context: "512K",
+    ability: 90,
+    providers: [
+      {
+        name: "Fireworks AI",
+        input: 0.3,
+        cached: 0.06,
+        output: 1.2,
+        latency: 560,
+        regions: ["全球", "北美", "欧洲", "亚太"],
+        color: "pink",
+      },
+    ],
+  },
 ];
-const briefs=[
- {tag:"ROUTER",time:"Today · 11:40",title:"OpenCode Go subscription pricing added",text:"OpenCode Go combines a $10/month base subscription with dollar-denominated five-hour, weekly, and monthly usage allowances.",impact:"It can suit sustained open-model coding workloads. Low-volume users should still compare pay-as-you-go routes. Coverage focuses on the US, EU, and Singapore."},
- {tag:"PRICING",time:"Today · 10:24",title:"Cache pricing is now included in route cost",text:"Cached input can cost 5–100× less than standard input, while some providers charge separately for cache writes.",impact:"Long system prompts, stable RAG prefixes, and repository context benefit most. Compare input, output, expected hit rate, and write frequency together."},
- {tag:"REGION",time:"Today · 09:10",title:"Qwen pricing differs across global, China, and US routes",text:"Alibaba Cloud prices models by deployment region and context tier, with limited-time discounts on selected SKUs.",impact:"US deployments may use different model IDs and prices from China or international routes. This tool filters unavailable routes, but provider terms remain authoritative."}
+const briefs = [
+  {
+    tag: "ROUTER",
+    time: "Today · 11:40",
+    title: "OpenCode Go subscription pricing added",
+    text: "OpenCode Go combines a $10/month base subscription with dollar-denominated five-hour, weekly, and monthly usage allowances.",
+    impact:
+      "It can suit sustained open-model coding workloads. Low-volume users should still compare pay-as-you-go routes. Coverage focuses on the US, EU, and Singapore.",
+  },
+  {
+    tag: "PRICING",
+    time: "Today · 10:24",
+    title: "Cache pricing is now included in route cost",
+    text: "Cached input can cost 5–100× less than standard input, while some providers charge separately for cache writes.",
+    impact:
+      "Long system prompts, stable RAG prefixes, and repository context benefit most. Compare input, output, expected hit rate, and write frequency together.",
+  },
+  {
+    tag: "REGION",
+    time: "Today · 09:10",
+    title: "Qwen pricing differs across global, China, and US routes",
+    text: "Alibaba Cloud prices models by deployment region and context tier, with limited-time discounts on selected SKUs.",
+    impact:
+      "US deployments may use different model IDs and prices from China or international routes. This tool filters unavailable routes, but provider terms remain authoritative.",
+  },
 ];
-const scenarios=[{icon:"⌁",title:"Customer support",desc:"High throughput, predictable cost, multilingual quality"},{icon:"⌘",title:"Coding assistant",desc:"Strong reasoning, long context, and tool use"},{icon:"✦",title:"Content pipelines",desc:"High-volume summarization, classification, and extraction"}];
-const regionOptions:Region[]=["全球","中国大陆","北美","欧洲","亚太"];
-export default function Home(){
- const[tab,setTab]=useState("prices"),[q,setQ]=useState(""),[sort,setSort]=useState("input"),[region,setRegion]=useState<Region>("全球"),[priority,setPriority]=useState("balanced"),[busy,setBusy]=useState(false),[updated,setUpdated]=useState("Not refreshed yet"),[toast,setToast]=useState(false),[openBrief,setOpenBrief]=useState<number|null>(null),[updates,setUpdates]=useState<PriceUpdate[]>([]),[sources,setSources]=useState<FetchSource[]>([]),[changes,setChanges]=useState<PriceChange[]>([]),[fetchError,setFetchError]=useState("");
- const[history,setHistory]=useState<HistorySnapshot[]>([]),[runs,setRuns]=useState<CollectionRun[]>([]),[checks,setChecks]=useState<SourceCheck[]>([]),[historyLoaded,setHistoryLoaded]=useState(false),[historyBusy,setHistoryBusy]=useState(false),[historyError,setHistoryError]=useState("");
- useEffect(()=>{if(!["history","health"].includes(tab)||historyLoaded)return;setHistoryBusy(true);fetch("/api/history",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error(`Server returned ${r.status}`);return r.json()}).then((data:{snapshots:HistorySnapshot[];runs:CollectionRun[];checks:SourceCheck[]})=>{setHistory(data.snapshots||[]);setRuns(data.runs||[]);setChecks(data.checks||[]);setHistoryLoaded(true)}).catch(e=>setHistoryError(e instanceof Error?e.message:"History unavailable")).finally(()=>setHistoryBusy(false))},[tab,historyLoaded]);
- const available=(p:P)=>region==="全球"?p.regions.includes("全球")||p.regions.length>1:p.regions.includes(region)||p.regions.includes("全球");
- const liveModels=useMemo(()=>models.map(m=>({...m,providers:m.providers.map(p=>{const u=updates.find(x=>x.model===m.name&&x.provider===p.name);return u?{...p,...Object.fromEntries(Object.entries(u).filter(([k,v])=>!['model','provider'].includes(k)&&v!=null)),verifiedAt:updated}:p})})),[updates,updated]);
- const shown=useMemo(()=>liveModels.map(m=>({...m,providers:m.providers.filter(available)})).filter(m=>m.providers.length&&(m.name+m.company+m.providers.map(p=>p.name)).toLowerCase().includes(q.toLowerCase())).sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):Math.min(...a.providers.map(p=>sort==="cached"?(p.cached??p.input):sort==="output"?p.output:p.input))-Math.min(...b.providers.map(p=>sort==="cached"?(p.cached??p.input):sort==="output"?p.output:p.input))),[q,sort,region,liveModels]);
- const liveBriefs=changes.length?changes.slice(0,8).map(c=>({tag:c.direction==="up"?"PRICE UP":"PRICE DOWN",time:"Latest refresh",title:`${providerLabel(c.provider)} · ${c.model} ${fieldName(c.field)} ${c.direction==="up"?"rose":"fell"} ${Math.abs(c.percent)}%`,text:`Per-million-token price moved from $${c.before} to $${c.after}.`,impact:c.direction==="up"?"This route is now more expensive and will rank lower for cost-focused recommendations. Review alternatives.":"This route is now cheaper and may rank higher in cost-focused recommendations."})):briefs;
- async function refresh(){if(busy)return;setBusy(true);setFetchError("");try{const response=await fetch("/api/prices",{cache:"no-store"});if(!response.ok)throw new Error(`Server returned ${response.status}`);const data=await response.json() as {collectedAt:string;sources:FetchSource[];updates:PriceUpdate[];changes:PriceChange[]};setSources(data.sources);setUpdates(data.updates);setChanges(data.changes||[]);setUpdated(new Date(data.collectedAt).toLocaleString("en-US",{hour12:false}));setToast(true);setTimeout(()=>setToast(false),2800)}catch(error){setFetchError(error instanceof Error?error.message:"Refresh failed")}finally{setBusy(false)}}
- function recommendation(i:number){const candidates=liveModels.flatMap(m=>m.providers.filter(available).map(p=>({m,p,score:priority==="price"?100-(p.input+p.output)*8:priority==="ability"?m.ability-(p.latency/1000):m.ability*.55-(p.input+p.output)*3-(p.latency/100)*.7+(i===0&&m.company.includes("Alibaba")?5:0)}))).sort((a,b)=>b.score-a.score);return candidates[i===2?Math.min(1,candidates.length-1):0]}
- return <main><Header tab={tab} setTab={setTab}/><Hero models={liveModels}/>
- <section className="panel wrap"><div className="panelTop"><div className="tabs">{[["prices","◫","Live pricing"],["calculator","$","Cost calculator"],["history","↗","Price history"],["health","●","Data health"],["brief","≡","Market brief"],["recommend","◇","Recommendations"]].map(x=><button key={x[0]} className={tab===x[0]?"on":""} onClick={()=>setTab(x[0])}><span>{x[1]}</span>{x[2]}{x[0]==="brief"&&<i>3</i>}</button>)}</div><div className="refresh"><small>Public provider pricing · Updated: {updated}</small><button onClick={refresh} disabled={busy}><b className={busy?"spin":""}>↻</b>{busy?"Checking official sources":"Refresh prices"}</button></div></div>
- {tab==="prices"&&<><div className="sourceNote"><b>No provider accounts required</b> Refresh uses public pricing pages, model catalogs, and official announcements—not paid inference APIs. Blocked or changed pages are clearly flagged for review.</div><div className="filters"><label>⌕<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search models or providers..."/></label><Filter label="Region" value={region} set={v=>setRegion(v as Region)} options={regionOptions.map(r=>`${r}|${regionLabel(r)}`)}/><Filter label="Sort by" value={sort} set={setSort} options={["input|Standard input","cached|Cached input","output|Output price","name|Model name"]}/><small>USD per 1M tokens</small></div><div className="grid">{shown.map(m=><article className="model" key={m.name}><div className="modelTitle"><i>{m.icon}</i><div><h2>{m.name}</h2><p>{m.company} · {m.context} context</p></div><small>{m.providers.length} available routes</small></div><div className="thead five"><span>Provider</span><span>Input</span><span>Cache read</span><span>Output</span><span>Latency</span></div>{m.providers.map((p,i)=><div className="row five" key={p.name}><div><b className={p.color}>{providerLabel(p.name)}</b>{i===m.providers.findIndex(v=>v.input===Math.min(...m.providers.map(x=>x.input)))&&<em>LOWEST INPUT</em>}</div><strong>${p.input.toFixed(3)}</strong><strong className="cache">{p.cached!=null?`$${p.cached.toFixed(4)}`:"—"}</strong><strong>${p.output.toFixed(2)}</strong><span className="latency"><i/> {p.latency}ms</span><small>{p.plan||p.regions.map(regionLabel).join(" / ")}{p.write!=null&&<b>Write ${p.write}</b>}{p.tag&&<b>{tagLabel(p.tag)}</b>}</small></div>)}</article>)}</div>{!shown.length&&<div className="empty">No matching routes are available in this region.</div>}</>}
- {tab==="brief"&&<div className="brief"><div><Title label="MARKET BRIEF" title="What changed across AI providers" sub="Pricing, regional availability, quotas, and service changes in one concise view."/>{liveBriefs.map((b,i)=><article key={b.title} className={openBrief===i?"expanded":""}><small>{b.time}　<b>{b.tag}</b></small><h3>{b.title}</h3><p>{b.text}</p><button onClick={()=>setOpenBrief(openBrief===i?null:i)}>{openBrief===i?"Hide analysis ↑":"View impact analysis →"}</button>{openBrief===i&&<div className="impact"><b>Selection impact</b><p>{b.impact}</p></div>}</article>)}</div><aside><h3>At a glance</h3><strong>{changes.length||3}</strong><span>{changes.length?"live price changes":"changes worth watching"}</span><hr/><small>Data basis</small><b className="lime">Snapshot diffs · official public pricing</b><small>Parsed this refresh</small><b>{updates.length} live prices</b><small>Safety check</small><b className="warn">Changes over 50% are quarantined</b></aside></div>}
- {tab==="recommend"&&<><Title label="USE-CASE MATCHING" title="Choose an API for the job" sub="Recommendations update with your region and priorities. Validate production workloads with a small-scale test."/><div className="recommendFilters"><Filter label="Region" value={region} set={v=>setRegion(v as Region)} options={regionOptions.map(r=>`${r}|${regionLabel(r)}`)}/><Filter label="Optimize for" value={priority} set={setPriority} options={["price|Lowest cost","balanced|Cost / capability balance","ability|Best capability"]}/><span>Only routes available in the selected region are ranked</span></div><div className="caseGrid">{scenarios.map((c,i)=>{const r=recommendation(i);return <article key={c.title}><i>{c.icon}</i><h3>{c.title}</h3><p>{c.desc}</p><div className="pick"><small>BEST FIT · {priority==="price"?"COST FIRST":priority==="ability"?"CAPABILITY FIRST":"BALANCED"}</small><strong>{r?.m.name}</strong><span>{providerLabel(r?.p.name||"")}</span></div><div className="price"><span>Input / cache read / output</span><b>${r?.p.input} / ${r?.p.cached??"—"} / ${r?.p.output}</b></div><p>Available in {regionLabel(region)}; ranked by model quality, route cost, cache pricing, and latency.</p><button onClick={()=>setTab("prices")}>Compare all available routes →</button></article>})}</div><div className="method"><b>Dynamic weights</b>{priority==="price"?"Cost 65% · capability 20% · latency 15%":priority==="ability"?"Capability 70% · cost 15% · latency 15%":"Capability 45% · cost 35% · latency 20%"}</div></>}
- {tab==="calculator"&&<CostCalculator models={liveModels} region={region} setRegion={setRegion}/>}
- {tab==="history"&&<HistoryView snapshots={history} runs={runs} busy={historyBusy} error={historyError}/>}
- {tab==="health"&&<HealthView checks={checks} runs={runs} busy={historyBusy} error={historyError}/>}
- {tab==="prices"&&(sources.length>0||fetchError)&&<SourceResults sources={sources} updates={updates} error={fetchError}/>}</section><footer className="wrap"><span>ModelScope · AI API market intelligence</span><span>Public prices may include promotions, tiers, and regional conditions. Provider billing pages remain authoritative.</span></footer>{toast&&<div className="toast"><i>✓</i><span><b>Public pricing refresh complete</b><small>Routes, regions, and market changes are up to date</small></span></div>}</main>}
-function Filter({label,value,set,options}:{label:string,value:string,set:(v:string)=>void,options:string[]}){return <span>{label} <select value={value} onChange={e=>set(e.target.value)}>{options.map(o=>{const[v,l]=o.includes("|")?o.split("|"):[o,o];return <option value={v} key={v}>{l}</option>})}</select></span>}
-function Header({tab,setTab}:{tab:string,setTab:(v:string)=>void}){return <header><a className="brand" href="#"><i>M</i>ModelScope</a><nav>{[["prices","Price explorer"],["calculator","Calculator"],["history","History"],["health","Data health"],["brief","Market brief"],["recommend","API finder"]].map(x=><button key={x[0]} className={tab===x[0]?"on":""} onClick={()=>setTab(x[0])}>{x[1]}</button>)}</nav><div className="health"><i/> Public sources online <button aria-label="Open data health" title="Data health" onClick={()=>setTab("health")}>●</button></div></header>}
-function Hero({models}:{models:M[]}){const providers=new Set(models.flatMap(m=>m.providers.map(p=>p.name))).size,routes=models.reduce((n,m)=>n+m.providers.length,0);return <section className="hero wrap"><div><b>AI API MARKET INTELLIGENCE</b><h1>Compare AI APIs.<br/><em>Spend smarter.</em></h1><p>Official pricing, cache economics, regional availability, and practical recommendations.<br/>Shortlist the right route without opening an account with every provider.</p></div><div className="heroCard"><div className="chartTitle"><span>Public price coverage</span><small>Provider pages & catalogs</small></div><div className="bars">{[55,68,46,82,64,91,74,58,70,49,62,44].map((h,i)=><i key={i} style={{height:h+"%"}}/>)}</div><div className="stats"><div><strong>{providers}</strong><small>Providers & routers</small></div><div><strong>{routes}</strong><small>Models & routes</small></div><div><strong>{regionOptions.length}</strong><small>Regional views</small></div></div></div></section>}
-function Title({label,title,sub}:{label:string,title:string,sub:string}){return <div className="title"><b>{label}</b><h2>{title}</h2><p>{sub}</p></div>}
-function HealthView({checks,runs,busy,error}:{checks:SourceCheck[];runs:CollectionRun[];busy:boolean;error:string}){
- const ids=[...new Set(checks.map(c=>c.sourceId))];
- const cards=ids.map(id=>{const all=checks.filter(c=>c.sourceId===id),latest=all[0],lastOk=all.find(c=>c.status==="ok"),failures=all.findIndex(c=>c.status==="ok");return{latest,lastOk,failures:failures<0?all.length:failures}});
- const healthy=cards.filter(c=>c.latest.status==="ok").length,lastRun=runs[0];
- return <div className="healthView"><Title label="COLLECTION HEALTH" title="Know how fresh each source really is" sub="Every manual refresh records source availability, parser health, and successful price extraction."/>
-  {busy&&<div className="historyState">Loading collection health…</div>}{error&&<div className="historyState error">{error}</div>}{!busy&&!error&&<>
-   <div className="healthSummary"><div><small>SOURCES HEALTHY</small><strong>{healthy}/{cards.length||9}</strong><span>on the latest recorded run</span></div><div><small>LAST COLLECTION</small><strong>{lastRun?ageLabel(lastRun.collectedAt):"No run"}</strong><span>{lastRun?`${lastRun.updateCount} accepted · ${lastRun.rejectedCount} quarantined`:"Run a manual refresh"}</span></div><p><b>Fresh</b> means the source parsed successfully during its most recent recorded check. A reachable page can still fail if its pricing structure changes.</p></div>
-   <div className="healthGrid">{cards.map(c=><a href={c.latest.url} target="_blank" rel="noreferrer" className={c.latest.status} key={c.latest.sourceId}><div><i/><b>{providerLabel(c.latest.sourceName)}</b><em>{healthLabel(c.latest.status)}</em></div><dl><dt>Last checked</dt><dd>{ageLabel(c.latest.checkedAt)}</dd><dt>Last successful</dt><dd>{c.lastOk?ageLabel(c.lastOk.checkedAt):"No successful check"}</dd><dt>Consecutive issues</dt><dd>{c.failures}</dd><dt>Prices extracted</dt><dd>{c.latest.records}</dd></dl><small>Open official source ↗</small></a>)}</div>
-   {!checks.length&&<div className="historyState">No source-health records yet. Run a manual price refresh, then return here.</div>}
-  </>}</div>
+const scenarios = [
+  {
+    icon: "⌁",
+    title: "Customer support",
+    desc: "High throughput, predictable cost, multilingual quality",
+  },
+  {
+    icon: "⌘",
+    title: "Coding assistant",
+    desc: "Strong reasoning, long context, and tool use",
+  },
+  {
+    icon: "✦",
+    title: "Content pipelines",
+    desc: "High-volume summarization, classification, and extraction",
+  },
+];
+const regionOptions: Region[] = ["全球", "中国大陆", "北美", "欧洲", "亚太"];
+export default function Home() {
+  const [tab, setTab] = useState("prices"),
+    [q, setQ] = useState(""),
+    [sort, setSort] = useState("input"),
+    [region, setRegion] = useState<Region>("全球"),
+    [priority, setPriority] = useState("balanced"),
+    [busy, setBusy] = useState(false),
+    [updated, setUpdated] = useState("Not refreshed yet"),
+    [toast, setToast] = useState(false),
+    [openBrief, setOpenBrief] = useState<number | null>(null),
+    [updates, setUpdates] = useState<PriceUpdate[]>([]),
+    [sources, setSources] = useState<FetchSource[]>([]),
+    [changes, setChanges] = useState<PriceChange[]>([]),
+    [fetchError, setFetchError] = useState("");
+  const [history, setHistory] = useState<HistorySnapshot[]>([]),
+    [quarantined, setQuarantined] = useState<HistorySnapshot[]>([]),
+    [runs, setRuns] = useState<CollectionRun[]>([]),
+    [checks, setChecks] = useState<SourceCheck[]>([]),
+    [historyLoaded, setHistoryLoaded] = useState(false),
+    [historyBusy, setHistoryBusy] = useState(false),
+    [historyError, setHistoryError] = useState("");
+  useEffect(() => {
+    if (!["history", "health"].includes(tab) || historyLoaded) return;
+    setHistoryBusy(true);
+    fetch("/api/history", { cache: "no-store" })
+      .then((r) => {
+        if (!r.ok) throw new Error(`Server returned ${r.status}`);
+        return r.json();
+      })
+      .then(
+        (data: {
+          snapshots: HistorySnapshot[];
+          quarantined: HistorySnapshot[];
+          runs: CollectionRun[];
+          checks: SourceCheck[];
+        }) => {
+          setHistory(data.snapshots || []);
+          setQuarantined(data.quarantined || []);
+          setRuns(data.runs || []);
+          setChecks(data.checks || []);
+          setHistoryLoaded(true);
+        },
+      )
+      .catch((e) =>
+        setHistoryError(e instanceof Error ? e.message : "History unavailable"),
+      )
+      .finally(() => setHistoryBusy(false));
+  }, [tab, historyLoaded]);
+  const available = (p: P) =>
+    region === "全球"
+      ? p.regions.includes("全球") || p.regions.length > 1
+      : p.regions.includes(region) || p.regions.includes("全球");
+  const liveModels = useMemo(
+    () =>
+      models.map((m) => ({
+        ...m,
+        providers: m.providers.map((p) => {
+          const u = updates.find(
+            (x) => x.model === m.name && x.provider === p.name,
+          );
+          return u
+            ? {
+                ...p,
+                ...Object.fromEntries(
+                  Object.entries(u).filter(
+                    ([k, v]) => !["model", "provider"].includes(k) && v != null,
+                  ),
+                ),
+                verifiedAt: u.verifiedAt,
+              }
+            : p;
+        }),
+      })),
+    [updates, updated],
+  );
+  const shown = useMemo(
+    () =>
+      liveModels
+        .map((m) => ({ ...m, providers: m.providers.filter(available) }))
+        .filter(
+          (m) =>
+            m.providers.length &&
+            (m.name + m.company + m.providers.map((p) => p.name))
+              .toLowerCase()
+              .includes(q.toLowerCase()),
+        )
+        .sort((a, b) =>
+          sort === "name"
+            ? a.name.localeCompare(b.name)
+            : Math.min(
+                ...a.providers.map((p) =>
+                  sort === "cached"
+                    ? (p.cached ?? p.input)
+                    : sort === "output"
+                      ? p.output
+                      : p.input,
+                ),
+              ) -
+              Math.min(
+                ...b.providers.map((p) =>
+                  sort === "cached"
+                    ? (p.cached ?? p.input)
+                    : sort === "output"
+                      ? p.output
+                      : p.input,
+                ),
+              ),
+        ),
+    [q, sort, region, liveModels],
+  );
+  const liveBriefs = changes.length
+    ? changes
+        .slice(0, 8)
+        .map((c) => ({
+          tag: c.direction === "up" ? "PRICE UP" : "PRICE DOWN",
+          time: "Latest refresh",
+          title: `${providerLabel(c.provider)} · ${c.model} ${fieldName(c.field)} ${c.direction === "up" ? "rose" : "fell"} ${Math.abs(c.percent)}%`,
+          text: `Per-million-token price moved from $${c.before} to $${c.after}.`,
+          impact:
+            c.direction === "up"
+              ? "This route is now more expensive and will rank lower for cost-focused recommendations. Review alternatives."
+              : "This route is now cheaper and may rank higher in cost-focused recommendations.",
+        }))
+    : briefs;
+  async function refresh() {
+    if (busy) return;
+    setBusy(true);
+    setFetchError("");
+    try {
+      const response = await fetch("/api/prices", { cache: "no-store" });
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
+      const data = (await response.json()) as {
+        collectedAt: string;
+        sources: FetchSource[];
+        updates: PriceUpdate[];
+        changes: PriceChange[];
+      };
+      setSources(data.sources);
+      setUpdates(data.updates);
+      setChanges(data.changes || []);
+      setUpdated(
+        new Date(data.collectedAt).toLocaleString("en-US", { hour12: false }),
+      );
+      setToast(true);
+      setTimeout(() => setToast(false), 2800);
+    } catch (error) {
+      setFetchError(error instanceof Error ? error.message : "Refresh failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+  function recommendation(i: number) {
+    const candidates = liveModels
+      .flatMap((m) =>
+        m.providers
+          .filter(available)
+          .map((p) => ({
+            m,
+            p,
+            score:
+              priority === "price"
+                ? 100 - (p.input + p.output) * 8
+                : priority === "ability"
+                  ? m.ability - p.latency / 1000
+                  : m.ability * 0.55 -
+                    (p.input + p.output) * 3 -
+                    (p.latency / 100) * 0.7 +
+                    (i === 0 && m.company.includes("Alibaba") ? 5 : 0),
+          })),
+      )
+      .sort((a, b) => b.score - a.score);
+    return candidates[i === 2 ? Math.min(1, candidates.length - 1) : 0];
+  }
+  return (
+    <main>
+      <Header tab={tab} setTab={setTab} />
+      <Hero models={liveModels} />
+      <section className="panel wrap">
+        <div className="panelTop">
+          <div className="tabs">
+            {[
+              ["prices", "◫", "Live pricing"],
+              ["calculator", "$", "Cost calculator"],
+              ["history", "↗", "Price history"],
+              ["health", "●", "Data health"],
+              ["brief", "≡", "Market brief"],
+              ["recommend", "◇", "Recommendations"],
+            ].map((x) => (
+              <button
+                key={x[0]}
+                className={tab === x[0] ? "on" : ""}
+                onClick={() => setTab(x[0])}
+              >
+                <span>{x[1]}</span>
+                {x[2]}
+                {x[0] === "brief" && <i>3</i>}
+              </button>
+            ))}
+          </div>
+          <div className="refresh">
+            <small>Public provider pricing · Updated: {updated}</small>
+            <button onClick={refresh} disabled={busy}>
+              <b className={busy ? "spin" : ""}>↻</b>
+              {busy ? "Checking official sources" : "Refresh prices"}
+            </button>
+          </div>
+        </div>
+        {tab === "prices" && (
+          <>
+            <div className="sourceNote">
+              <b>No provider accounts required</b> Every route shows whether its
+              price was verified now, retained from a previous verification, or
+              included as reference data. Official billing pages remain
+              authoritative.
+            </div>
+            <div className="filters">
+              <label>
+                ⌕
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search models or providers..."
+                />
+              </label>
+              <Filter
+                label="Region"
+                value={region}
+                set={(v) => setRegion(v as Region)}
+                options={regionOptions.map((r) => `${r}|${regionLabel(r)}`)}
+              />
+              <Filter
+                label="Sort by"
+                value={sort}
+                set={setSort}
+                options={[
+                  "input|Standard input",
+                  "cached|Cached input",
+                  "output|Output price",
+                  "name|Model name",
+                ]}
+              />
+              <small>USD per 1M tokens</small>
+            </div>
+            <div className="grid">
+              {shown.map((m) => (
+                <article className="model" key={m.name}>
+                  <div className="modelTitle">
+                    <i>{m.icon}</i>
+                    <div>
+                      <h2>{m.name}</h2>
+                      <p>
+                        {m.company} · {m.context} context
+                      </p>
+                    </div>
+                    <small>{m.providers.length} available routes</small>
+                  </div>
+                  <div className="thead five">
+                    <span>Provider</span>
+                    <span>Input</span>
+                    <span>Cache read</span>
+                    <span>Output</span>
+                    <span>Latency*</span>
+                  </div>
+                  {m.providers.map((p, i) => (
+                    <div className="row five" key={p.name}>
+                      <div>
+                        <b className={p.color}>{providerLabel(p.name)}</b>
+                        {i ===
+                          m.providers.findIndex(
+                            (v) =>
+                              v.input ===
+                              Math.min(...m.providers.map((x) => x.input)),
+                          ) && <em>LOWEST INPUT</em>}
+                        <em
+                          className={`trust ${p.verificationStatus ?? "reference"}`}
+                        >
+                          {verificationLabel(
+                            p.verificationStatus ?? "reference",
+                          )}
+                        </em>
+                      </div>
+                      <strong>${p.input.toFixed(3)}</strong>
+                      <strong className="cache">
+                        {p.cached != null ? `$${p.cached.toFixed(4)}` : "—"}
+                      </strong>
+                      <strong>${p.output.toFixed(2)}</strong>
+                      <span className="latency">
+                        <i /> {p.latency}ms
+                      </span>
+                      <small>
+                        {p.sourceUrl ? (
+                          <a href={p.sourceUrl} target="_blank" rel="noreferrer">
+                            {providerLabel(p.source ?? p.name)} source ↗
+                          </a>
+                        ) : (
+                          p.plan || p.regions.map(regionLabel).join(" / ")
+                        )}
+                        {p.verifiedAt && (
+                          <b className={freshness(p.verifiedAt).toLowerCase()}>
+                            {freshness(p.verifiedAt)} · {ageLabel(p.verifiedAt)}
+                          </b>
+                        )}
+                        {p.write != null && <b>Write ${p.write}</b>}
+                        {p.tag && <b>{tagLabel(p.tag)}</b>}
+                      </small>
+                    </div>
+                  ))}
+                </article>
+              ))}
+            </div>
+            <div className="dataLegend">
+              * Latency is an editorial planning estimate, not a live benchmark.
+              Reference routes are excluded from claims of live verification.
+            </div>
+            {!shown.length && (
+              <div className="empty">
+                No matching routes are available in this region.
+              </div>
+            )}
+          </>
+        )}
+        {tab === "brief" && (
+          <div className="brief">
+            <div>
+              <Title
+                label="MARKET BRIEF"
+                title="What changed across AI providers"
+                sub="Pricing, regional availability, quotas, and service changes in one concise view."
+              />
+              {liveBriefs.map((b, i) => (
+                <article
+                  key={b.title}
+                  className={openBrief === i ? "expanded" : ""}
+                >
+                  <small>
+                    {b.time}　<b>{b.tag}</b>
+                  </small>
+                  <h3>{b.title}</h3>
+                  <p>{b.text}</p>
+                  <button
+                    onClick={() => setOpenBrief(openBrief === i ? null : i)}
+                  >
+                    {openBrief === i
+                      ? "Hide analysis ↑"
+                      : "View impact analysis →"}
+                  </button>
+                  {openBrief === i && (
+                    <div className="impact">
+                      <b>Selection impact</b>
+                      <p>{b.impact}</p>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+            <aside>
+              <h3>At a glance</h3>
+              <strong>{changes.length || 3}</strong>
+              <span>
+                {changes.length
+                  ? "live price changes"
+                  : "changes worth watching"}
+              </span>
+              <hr />
+              <small>Data basis</small>
+              <b className="lime">Snapshot diffs · official public pricing</b>
+              <small>Parsed this refresh</small>
+              <b>{updates.length} live prices</b>
+              <small>Safety check</small>
+              <b className="warn">Changes over 50% are quarantined</b>
+            </aside>
+          </div>
+        )}
+        {tab === "recommend" && (
+          <>
+            <Title
+              label="USE-CASE MATCHING"
+              title="Choose an API for the job"
+              sub="Recommendations update with your region and priorities. Validate production workloads with a small-scale test."
+            />
+            <div className="recommendFilters">
+              <Filter
+                label="Region"
+                value={region}
+                set={(v) => setRegion(v as Region)}
+                options={regionOptions.map((r) => `${r}|${regionLabel(r)}`)}
+              />
+              <Filter
+                label="Optimize for"
+                value={priority}
+                set={setPriority}
+                options={[
+                  "price|Lowest cost",
+                  "balanced|Cost / capability balance",
+                  "ability|Best capability",
+                ]}
+              />
+              <span>
+                Only routes available in the selected region are ranked
+              </span>
+            </div>
+            <div className="caseGrid">
+              {scenarios.map((c, i) => {
+                const r = recommendation(i);
+                return (
+                  <article key={c.title}>
+                    <i>{c.icon}</i>
+                    <h3>{c.title}</h3>
+                    <p>{c.desc}</p>
+                    <div className="pick">
+                      <small>
+                        BEST FIT ·{" "}
+                        {priority === "price"
+                          ? "COST FIRST"
+                          : priority === "ability"
+                            ? "CAPABILITY FIRST"
+                            : "BALANCED"}
+                      </small>
+                      <strong>{r?.m.name}</strong>
+                      <span>{providerLabel(r?.p.name || "")}</span>
+                    </div>
+                    <div className="price">
+                      <span>Input / cache read / output</span>
+                      <b>
+                        ${r?.p.input} / ${r?.p.cached ?? "—"} / ${r?.p.output}
+                      </b>
+                    </div>
+                    <p>
+                      Available in {regionLabel(region)}; ranked by model
+                      quality, route cost, cache pricing, and latency.
+                    </p>
+                    <button onClick={() => setTab("prices")}>
+                      Compare all available routes →
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="method">
+              <b>Dynamic weights</b>
+              {priority === "price"
+                ? "Cost 65% · capability 20% · latency 15%"
+                : priority === "ability"
+                  ? "Capability 70% · cost 15% · latency 15%"
+                  : "Capability 45% · cost 35% · latency 20%"}
+            </div>
+          </>
+        )}
+        {tab === "calculator" && (
+          <CostCalculator
+            models={liveModels}
+            region={region}
+            setRegion={setRegion}
+          />
+        )}
+        {tab === "history" && (
+          <HistoryView
+            snapshots={history}
+            runs={runs}
+            busy={historyBusy}
+            error={historyError}
+          />
+        )}
+        {tab === "health" && (
+          <HealthView
+            checks={checks}
+            runs={runs}
+            quarantined={quarantined}
+            busy={historyBusy}
+            error={historyError}
+          />
+        )}
+        {tab === "prices" && (sources.length > 0 || fetchError) && (
+          <SourceResults
+            sources={sources}
+            updates={updates}
+            error={fetchError}
+          />
+        )}
+      </section>
+      <footer className="wrap">
+        <span>ModelScope · AI API market intelligence</span>
+        <span>
+          Public prices may include promotions, tiers, and regional conditions.
+          Provider billing pages remain authoritative.
+        </span>
+      </footer>
+      {toast && (
+        <div className="toast">
+          <i>✓</i>
+          <span>
+            <b>Public pricing refresh complete</b>
+            <small>Routes, regions, and market changes are up to date</small>
+          </span>
+        </div>
+      )}
+    </main>
+  );
 }
-function healthLabel(status:SourceCheck["status"]){return({ok:"Healthy",changed:"Parser review",blocked:"Restricted",error:"Failed"})[status]}
-function ageLabel(iso:string){const ms=Date.now()-new Date(iso).getTime(),minutes=Math.max(0,Math.floor(ms/60000));return minutes<1?"just now":minutes<60?`${minutes}m ago`:minutes<1440?`${Math.floor(minutes/60)}h ago`:`${Math.floor(minutes/1440)}d ago`}
-function CostCalculator({models,region,setRegion}:{models:M[];region:Region;setRegion:(r:Region)=>void}){
- const[inputTokens,setInputTokens]=useState(100_000_000),[outputTokens,setOutputTokens]=useState(20_000_000),[hitRate,setHitRate]=useState(40),[writeRate,setWriteRate]=useState(5);
- const available=(p:P)=>region==="全球"?p.regions.includes("全球")||p.regions.length>1:p.regions.includes(region)||p.regions.includes("全球");
- const inputM=Math.max(0,inputTokens)/1e6,outputM=Math.max(0,outputTokens)/1e6,hit=Math.min(100,Math.max(0,hitRate))/100,write=Math.min(100,Math.max(0,writeRate))/100;
- const ranked=models.flatMap(m=>m.providers.filter(available).map(p=>{const standard=inputM*(1-hit)*p.input,cached=inputM*hit*(p.cached??p.input),cacheWrite=inputM*write*(p.write??0),output=outputM*p.output;return{m,p,standard,cached,cacheWrite,output,total:standard+cached+cacheWrite+output}})).sort((a,b)=>a.total-b.total);
- const best=ranked[0]?.total||0;
- return <div className="calculator"><Title label="USAGE COST CALCULATOR" title="Estimate your monthly AI API bill" sub="Model standard input, cache reads, cache writes, and output separately using public per-token prices."/>
-  <div className="calcInputs"><label>Monthly input tokens<input type="number" min="0" step="1000000" value={inputTokens} onChange={e=>setInputTokens(+e.target.value)}/></label><label>Monthly output tokens<input type="number" min="0" step="1000000" value={outputTokens} onChange={e=>setOutputTokens(+e.target.value)}/></label><label>Expected cache hit<input type="range" min="0" max="100" value={hitRate} onChange={e=>setHitRate(+e.target.value)}/><b>{hitRate}%</b></label><label>Cache write volume<input type="range" min="0" max="100" value={writeRate} onChange={e=>setWriteRate(+e.target.value)}/><b>{writeRate}%</b></label><Filter label="Region" value={region} set={v=>setRegion(v as Region)} options={regionOptions.map(r=>`${r}|${regionLabel(r)}`)}/></div>
-  <div className="calcSummary"><div><small>WORKLOAD</small><strong>{formatTokens(inputTokens+outputTokens)}</strong><span>tokens / month</span></div><div><small>LOWEST ESTIMATE</small><strong>${best.toFixed(2)}</strong><span>{ranked[0]?`${ranked[0].m.name} · ${providerLabel(ranked[0].p.name)}`:"No route"}</span></div><p>Estimates exclude taxes, data transfer, minimum commitments, subscription fees, and provider-specific rounding. Cache-write cost is included only where the provider publishes it.</p></div>
-  <div className="calcTable"><div className="calcHead"><span>Model / provider</span><span>Standard input</span><span>Cache read</span><span>Cache write</span><span>Output</span><span>Est. monthly</span></div>{ranked.slice(0,15).map((r,i)=><div className="calcRow" key={`${r.m.name}-${r.p.name}`}><span><b>{r.m.name}</b><small>{providerLabel(r.p.name)} · {regionLabel(region)}</small></span><code>${r.standard.toFixed(2)}</code><code>${r.cached.toFixed(2)}</code><code>${r.cacheWrite.toFixed(2)}</code><code>${r.output.toFixed(2)}</code><strong>${r.total.toFixed(2)}{i===0&&<em>BEST</em>}</strong></div>)}</div>
- </div>
+function Filter({
+  label,
+  value,
+  set,
+  options,
+}: {
+  label: string;
+  value: string;
+  set: (v: string) => void;
+  options: string[];
+}) {
+  return (
+    <span>
+      {label}{" "}
+      <select value={value} onChange={(e) => set(e.target.value)}>
+        {options.map((o) => {
+          const [v, l] = o.includes("|") ? o.split("|") : [o, o];
+          return (
+            <option value={v} key={v}>
+              {l}
+            </option>
+          );
+        })}
+      </select>
+    </span>
+  );
 }
-function formatTokens(value:number){return value>=1e9?`${(value/1e9).toFixed(1)}B`:value>=1e6?`${(value/1e6).toFixed(1)}M`:Math.round(value).toLocaleString("en-US")}
-function HistoryView({snapshots,runs,busy,error}:{snapshots:HistorySnapshot[];runs:CollectionRun[];busy:boolean;error:string}){
- const models=[...new Set(snapshots.map(s=>s.model))];
- const[model,setModel]=useState("all"),[field,setField]=useState<"input"|"cached"|"output">("input");
- const visible=snapshots.filter(s=>model==="all"||s.model===model);
- const routes=[...new Set(visible.map(s=>`${s.model}|||${s.provider}`))].slice(0,8);
- return <div className="historyView"><Title label="PRICE HISTORY" title="Track pricing over time" sub="Accepted snapshots only. Large anomalies are quarantined before they appear here."/>
-  {busy&&<div className="historyState">Loading saved snapshots…</div>}{error&&<div className="historyState error">{error}</div>}{!busy&&!error&&<>
-   <div className="historyFilters"><Filter label="Model" value={model} set={setModel} options={["all|All models",...models]}/><Filter label="Metric" value={field} set={v=>setField(v as "input"|"cached"|"output")} options={["input|Standard input","cached|Cache read","output|Output"]}/><span>{snapshots.length} accepted snapshots · {runs.length} recent collection runs</span></div>
-   <div className="trendGrid">{routes.map(key=>{const[m,p]=key.split("|||");const points=visible.filter(s=>s.model===m&&s.provider===p&&s[field]!=null).slice(0,12).reverse();const values=points.map(x=>Number(x[field]));const max=Math.max(...values,1e-9),latest=values.at(-1);return <article key={key}><div><b>{m}</b><span>{providerLabel(p)}</span></div><strong>{latest==null?"—":`$${latest.toFixed(field==="cached"?4:3)}`}</strong><div className="miniBars" aria-label={`${fieldName(field)} trend`}>{values.map((v,i)=><i key={i} style={{height:`${Math.max(8,v/max*100)}%`}} title={`${new Date(points[i].collectedAt).toLocaleString("en-US")}: $${v}`}/>)}</div><small>{points.length} observations · USD / 1M tokens</small></article>})}</div>
-   <div className="historyTable"><div className="historyHead"><span>Collected</span><span>Model / provider</span><span>Input</span><span>Cache read</span><span>Output</span><span>Max change</span></div>{visible.slice(0,30).map(s=><div className="historyRow" key={s.id}><time>{new Date(s.collectedAt).toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"})}</time><span><b>{s.model}</b><small>{providerLabel(s.provider)}</small></span><code>{money(s.input,3)}</code><code>{money(s.cached,4)}</code><code>{money(s.output,3)}</code><em className={(s.changePercent||0)>0?"moved":"flat"}>{s.changePercent?`${s.changePercent.toFixed(1)}%`:"No change"}</em></div>)}</div>
-   {!snapshots.length&&<div className="historyState">No snapshots yet. Run a manual price refresh to start history.</div>}
-  </>}</div>
+function Header({ tab, setTab }: { tab: string; setTab: (v: string) => void }) {
+  return (
+    <header>
+      <a className="brand" href="#">
+        <i>M</i>ModelScope
+      </a>
+      <nav>
+        {[
+          ["prices", "Price explorer"],
+          ["calculator", "Calculator"],
+          ["history", "History"],
+          ["health", "Data health"],
+          ["brief", "Market brief"],
+          ["recommend", "API finder"],
+        ].map((x) => (
+          <button
+            key={x[0]}
+            className={tab === x[0] ? "on" : ""}
+            onClick={() => setTab(x[0])}
+          >
+            {x[1]}
+          </button>
+        ))}
+      </nav>
+      <div className="health">
+        <i /> Public sources online{" "}
+        <button
+          aria-label="Open data health"
+          title="Data health"
+          onClick={() => setTab("health")}
+        >
+          ●
+        </button>
+      </div>
+    </header>
+  );
 }
-function money(value:number|null,digits:number){return value==null?"—":`$${value.toFixed(digits)}`}
-function SourceResults({sources,updates,error}:{sources:FetchSource[];updates:PriceUpdate[];error:string}){
- const evidence=updates.filter(u=>u.tier||u.currency||u.pricingRegion);
- return <div className="sourceResults">{error?<div className="fetchFailure">Refresh failed: {error}</div>:<>
-  <div className="sourceSummary"><b>{sources.filter(s=>s.status==="ok").length}/{sources.length}</b> sources healthy <span>· {updates.length} live prices applied</span></div>
-  <div className="sourceChips">{sources.map(s=><a href={s.url} target="_blank" rel="noreferrer" title={s.detail} className={s.status} key={s.id}><i/>{providerLabel(s.name)}<small>{s.status==="ok"?(s.records?`${s.records} updates`:"Verified"):s.status==="blocked"?"Restricted":s.status==="changed"?"Parser review":"Failed"}</small></a>)}</div>
-  {evidence.length>0&&<div className="evidence"><h4>PRICE BASIS FOR THIS REFRESH</h4>{evidence.map(u=><article key={`${u.model}-${u.provider}`}><div><b>{u.model}</b><span>{providerLabel(u.provider)}</span></div><p>{u.pricingRegion&&<em>{regionText(u.pricingRegion)}</em>}{u.tier&&<em>{tierText(u.tier)}</em>}{u.discountPercent!=null&&u.discountPercent>0&&<em>{u.discountPercent}% discount</em>}</p>{u.currency&&u.currency!=="USD"&&<small>Native price: input {u.nativeInput} / output {u.nativeOutput} {u.currency} · USD conversion rate {u.fxRate?.toFixed(4)}{u.fxAsOf&&` (${u.fxAsOf})`}</small>}{u.currency==="USD"&&u.listInput!=null&&<small>Current input / output: ${u.input} / ${u.output}; peak benchmark: ${u.listInput} / ${u.listOutput}</small>}</article>)}</div>}
- </>}</div>
+function Hero({ models }: { models: M[] }) {
+  const providers = new Set(
+      models.flatMap((m) => m.providers.map((p) => p.name)),
+    ).size,
+    routes = models.reduce((n, m) => n + m.providers.length, 0);
+  return (
+    <section className="hero wrap">
+      <div>
+        <b>AI API MARKET INTELLIGENCE</b>
+        <h1>
+          Compare AI APIs.
+          <br />
+          <em>Spend smarter.</em>
+        </h1>
+        <p>
+          Official pricing, cache economics, regional availability, and
+          practical recommendations.
+          <br />
+          Shortlist the right route without opening an account with every
+          provider.
+        </p>
+      </div>
+      <div className="heroCard">
+        <div className="chartTitle">
+          <span>Public price coverage</span>
+          <small>Provider pages & catalogs</small>
+        </div>
+        <div className="bars">
+          {[55, 68, 46, 82, 64, 91, 74, 58, 70, 49, 62, 44].map((h, i) => (
+            <i key={i} style={{ height: h + "%" }} />
+          ))}
+        </div>
+        <div className="stats">
+          <div>
+            <strong>{providers}</strong>
+            <small>Providers & routers</small>
+          </div>
+          <div>
+            <strong>{routes}</strong>
+            <small>Models & routes</small>
+          </div>
+          <div>
+            <strong>{regionOptions.length}</strong>
+            <small>Regional views</small>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
-function fieldName(field:string){return({input:"input price",cached:"cache-read price",write:"cache-write price",output:"output price"} as Record<string,string>)[field]||field}
-function providerLabel(name:string){return({"Anthropic 官方":"Anthropic Direct","OpenAI 官方":"OpenAI Direct","DeepSeek 官方":"DeepSeek Direct","阿里云百炼":"Alibaba Cloud Model Studio"} as Record<string,string>)[name]||name}
-function regionLabel(region:string){return({"全球":"Global","中国大陆":"Mainland China","北美":"North America","欧洲":"Europe","亚太":"Asia Pacific"} as Record<string,string>)[region]||region}
-function tagLabel(tag:string){return({"企业 SLA":"Enterprise SLA","峰谷计价":"Time-of-day pricing","待官网刷新":"Awaiting official refresh","订阅额度":"Subscription allowance","地区阶梯价":"Regional tiers","省 2%":"Save 2%"} as Record<string,string>)[tag]||tag}
-function regionText(text:string){return text.replace("中国大陆 · 华北2（北京）","Mainland China · Beijing")}
-function tierText(text:string){return text.replace("峰值时段外","outside peak hours")}
+function Title({
+  label,
+  title,
+  sub,
+}: {
+  label: string;
+  title: string;
+  sub: string;
+}) {
+  return (
+    <div className="title">
+      <b>{label}</b>
+      <h2>{title}</h2>
+      <p>{sub}</p>
+    </div>
+  );
+}
+function HealthView({
+  checks,
+  runs,
+  quarantined,
+  busy,
+  error,
+}: {
+  checks: SourceCheck[];
+  runs: CollectionRun[];
+  quarantined: HistorySnapshot[];
+  busy: boolean;
+  error: string;
+}) {
+  const ids = [...new Set(checks.map((c) => c.sourceId))];
+  const cards = ids.map((id) => {
+    const all = checks.filter((c) => c.sourceId === id),
+      latest = all[0],
+      lastOk = all.find((c) => c.status === "ok"),
+      failures = all.findIndex((c) => c.status === "ok");
+    return { latest, lastOk, failures: failures < 0 ? all.length : failures };
+  });
+  const healthy = cards.filter((c) => c.latest.status === "ok").length,
+    lastRun = runs[0];
+  return (
+    <div className="healthView">
+      <Title
+        label="COLLECTION HEALTH"
+        title="Know how fresh each source really is"
+        sub="Every manual refresh records source availability, parser health, and successful price extraction."
+      />
+      {busy && <div className="historyState">Loading collection health…</div>}
+      {error && <div className="historyState error">{error}</div>}
+      {!busy && !error && (
+        <>
+          <div className="healthSummary">
+            <div>
+              <small>SOURCES HEALTHY</small>
+              <strong>
+                {healthy}/{cards.length || 12}
+              </strong>
+              <span>on the latest recorded run</span>
+            </div>
+            <div>
+              <small>LAST COLLECTION</small>
+              <strong>
+                {lastRun ? ageLabel(lastRun.collectedAt) : "No run"}
+              </strong>
+              <span>
+                {lastRun
+                  ? `${lastRun.updateCount} accepted · ${lastRun.rejectedCount} quarantined`
+                  : "Run a manual refresh"}
+              </span>
+            </div>
+            <p>
+              <b>Fresh</b> means the source parsed successfully during its most
+              recent recorded check. A reachable page can still fail if its
+              pricing structure changes.
+            </p>
+          </div>
+          <div className="healthGrid">
+            {cards.map((c) => (
+              <a
+                href={c.latest.url}
+                target="_blank"
+                rel="noreferrer"
+                className={c.latest.status}
+                key={c.latest.sourceId}
+              >
+                <div>
+                  <i />
+                  <b>{providerLabel(c.latest.sourceName)}</b>
+                  <em>{healthLabel(c.latest.status)}</em>
+                </div>
+                <dl>
+                  <dt>Last checked</dt>
+                  <dd>{ageLabel(c.latest.checkedAt)}</dd>
+                  <dt>Last successful</dt>
+                  <dd>
+                    {c.lastOk
+                      ? ageLabel(c.lastOk.checkedAt)
+                      : "No successful check"}
+                  </dd>
+                  <dt>Consecutive issues</dt>
+                  <dd>{c.failures}</dd>
+                  <dt>Prices extracted</dt>
+                  <dd>{c.latest.records}</dd>
+                </dl>
+                <small>Open official source ↗</small>
+              </a>
+            ))}
+          </div>
+          <section className="quarantinePanel">
+            <div>
+              <b>ANOMALY REVIEW</b>
+              <h3>Quarantined price changes</h3>
+              <p>
+                Changes above 50% are stored for review but never applied to
+                comparisons or recommendations.
+              </p>
+            </div>
+            {quarantined.length ? (
+              <div className="quarantineTable">
+                {quarantined.slice(0, 8).map((item) => (
+                  <article key={item.id}>
+                    <span>
+                      <strong>{item.model}</strong>
+                      <small>{providerLabel(item.provider)}</small>
+                    </span>
+                    <code>{money(item.input, 3)} → {money(item.output, 3)}</code>
+                    <em>{item.changePercent?.toFixed(1) ?? "—"}% change</em>
+                    <time>{ageLabel(item.collectedAt)}</time>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="quarantineEmpty">No quarantined changes.</div>
+            )}
+          </section>
+          {!checks.length && (
+            <div className="historyState">
+              No source-health records yet. Run a manual price refresh, then
+              return here.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+function healthLabel(status: SourceCheck["status"]) {
+  return {
+    ok: "Healthy",
+    changed: "Parser review",
+    blocked: "Restricted",
+    error: "Failed",
+  }[status];
+}
+function ageLabel(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime(),
+    minutes = Math.max(0, Math.floor(ms / 60000));
+  return minutes < 1
+    ? "just now"
+    : minutes < 60
+      ? `${minutes}m ago`
+      : minutes < 1440
+        ? `${Math.floor(minutes / 60)}h ago`
+        : `${Math.floor(minutes / 1440)}d ago`;
+}
+function freshness(iso: string) {
+  const hours = Math.max(0, Date.now() - new Date(iso).getTime()) / 3_600_000;
+  return hours <= 24 ? "Fresh" : hours <= 168 ? "Aging" : "Stale";
+}
+function verificationLabel(status: VerificationStatus) {
+  return {
+    verified: "VERIFIED NOW",
+    previously_verified: "PREVIOUSLY VERIFIED",
+    reference: "REFERENCE",
+    quarantined: "QUARANTINED",
+  }[status];
+}
+function CostCalculator({
+  models,
+  region,
+  setRegion,
+}: {
+  models: M[];
+  region: Region;
+  setRegion: (r: Region) => void;
+}) {
+  const [inputTokens, setInputTokens] = useState(100_000_000),
+    [outputTokens, setOutputTokens] = useState(20_000_000),
+    [hitRate, setHitRate] = useState(40),
+    [writeRate, setWriteRate] = useState(5);
+  const available = (p: P) =>
+    region === "全球"
+      ? p.regions.includes("全球") || p.regions.length > 1
+      : p.regions.includes(region) || p.regions.includes("全球");
+  const inputM = Math.max(0, inputTokens) / 1e6,
+    outputM = Math.max(0, outputTokens) / 1e6,
+    hit = Math.min(100, Math.max(0, hitRate)) / 100,
+    write = Math.min(100, Math.max(0, writeRate)) / 100;
+  const ranked = models
+    .flatMap((m) =>
+      m.providers.filter(available).map((p) => {
+        const standard = inputM * (1 - hit) * p.input,
+          cached = inputM * hit * (p.cached ?? p.input),
+          cacheWrite = inputM * write * (p.write ?? 0),
+          output = outputM * p.output;
+        return {
+          m,
+          p,
+          standard,
+          cached,
+          cacheWrite,
+          output,
+          total: standard + cached + cacheWrite + output,
+        };
+      }),
+    )
+    .sort((a, b) => a.total - b.total);
+  const best = ranked[0]?.total || 0;
+  return (
+    <div className="calculator">
+      <Title
+        label="USAGE COST CALCULATOR"
+        title="Estimate your monthly AI API bill"
+        sub="Model standard input, cache reads, cache writes, and output separately using public per-token prices."
+      />
+      <div className="calcInputs">
+        <label>
+          Monthly input tokens
+          <input
+            type="number"
+            min="0"
+            step="1000000"
+            value={inputTokens}
+            onChange={(e) => setInputTokens(+e.target.value)}
+          />
+        </label>
+        <label>
+          Monthly output tokens
+          <input
+            type="number"
+            min="0"
+            step="1000000"
+            value={outputTokens}
+            onChange={(e) => setOutputTokens(+e.target.value)}
+          />
+        </label>
+        <label>
+          Expected cache hit
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={hitRate}
+            onChange={(e) => setHitRate(+e.target.value)}
+          />
+          <b>{hitRate}%</b>
+        </label>
+        <label>
+          Cache write volume
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={writeRate}
+            onChange={(e) => setWriteRate(+e.target.value)}
+          />
+          <b>{writeRate}%</b>
+        </label>
+        <Filter
+          label="Region"
+          value={region}
+          set={(v) => setRegion(v as Region)}
+          options={regionOptions.map((r) => `${r}|${regionLabel(r)}`)}
+        />
+      </div>
+      <div className="calcSummary">
+        <div>
+          <small>WORKLOAD</small>
+          <strong>{formatTokens(inputTokens + outputTokens)}</strong>
+          <span>tokens / month</span>
+        </div>
+        <div>
+          <small>LOWEST ESTIMATE</small>
+          <strong>${best.toFixed(2)}</strong>
+          <span>
+            {ranked[0]
+              ? `${ranked[0].m.name} · ${providerLabel(ranked[0].p.name)}`
+              : "No route"}
+          </span>
+        </div>
+        <p>
+          Estimates exclude taxes, data transfer, minimum commitments,
+          subscription fees, and provider-specific rounding. Cache-write cost is
+          included only where the provider publishes it.
+        </p>
+      </div>
+      <div className="calcTable">
+        <div className="calcHead">
+          <span>Model / provider</span>
+          <span>Standard input</span>
+          <span>Cache read</span>
+          <span>Cache write</span>
+          <span>Output</span>
+          <span>Est. monthly</span>
+        </div>
+        {ranked.slice(0, 15).map((r, i) => (
+          <div className="calcRow" key={`${r.m.name}-${r.p.name}`}>
+            <span>
+              <b>{r.m.name}</b>
+              <small>
+                {providerLabel(r.p.name)} · {regionLabel(region)}
+              </small>
+            </span>
+            <code>${r.standard.toFixed(2)}</code>
+            <code>${r.cached.toFixed(2)}</code>
+            <code>${r.cacheWrite.toFixed(2)}</code>
+            <code>${r.output.toFixed(2)}</code>
+            <strong>
+              ${r.total.toFixed(2)}
+              {i === 0 && <em>BEST</em>}
+            </strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function formatTokens(value: number) {
+  return value >= 1e9
+    ? `${(value / 1e9).toFixed(1)}B`
+    : value >= 1e6
+      ? `${(value / 1e6).toFixed(1)}M`
+      : Math.round(value).toLocaleString("en-US");
+}
+function HistoryView({
+  snapshots,
+  runs,
+  busy,
+  error,
+}: {
+  snapshots: HistorySnapshot[];
+  runs: CollectionRun[];
+  busy: boolean;
+  error: string;
+}) {
+  const models = [...new Set(snapshots.map((s) => s.model))];
+  const [model, setModel] = useState("all"),
+    [field, setField] = useState<"input" | "cached" | "output">("input");
+  const visible = snapshots.filter((s) => model === "all" || s.model === model);
+  const routes = [
+    ...new Set(visible.map((s) => `${s.model}|||${s.provider}`)),
+  ].slice(0, 8);
+  return (
+    <div className="historyView">
+      <Title
+        label="PRICE HISTORY"
+        title="Track pricing over time"
+        sub="Accepted snapshots only. Large anomalies are quarantined before they appear here."
+      />
+      {busy && <div className="historyState">Loading saved snapshots…</div>}
+      {error && <div className="historyState error">{error}</div>}
+      {!busy && !error && (
+        <>
+          <div className="historyFilters">
+            <Filter
+              label="Model"
+              value={model}
+              set={setModel}
+              options={["all|All models", ...models]}
+            />
+            <Filter
+              label="Metric"
+              value={field}
+              set={(v) => setField(v as "input" | "cached" | "output")}
+              options={[
+                "input|Standard input",
+                "cached|Cache read",
+                "output|Output",
+              ]}
+            />
+            <span>
+              {snapshots.length} accepted snapshots · {runs.length} recent
+              collection runs
+            </span>
+          </div>
+          <div className="trendGrid">
+            {routes.map((key) => {
+              const [m, p] = key.split("|||");
+              const points = visible
+                .filter(
+                  (s) => s.model === m && s.provider === p && s[field] != null,
+                )
+                .slice(0, 12)
+                .reverse();
+              const values = points.map((x) => Number(x[field]));
+              const max = Math.max(...values, 1e-9),
+                latest = values.at(-1);
+              return (
+                <article key={key}>
+                  <div>
+                    <b>{m}</b>
+                    <span>{providerLabel(p)}</span>
+                  </div>
+                  <strong>
+                    {latest == null
+                      ? "—"
+                      : `$${latest.toFixed(field === "cached" ? 4 : 3)}`}
+                  </strong>
+                  <div
+                    className="miniBars"
+                    aria-label={`${fieldName(field)} trend`}
+                  >
+                    {values.map((v, i) => (
+                      <i
+                        key={i}
+                        style={{ height: `${Math.max(8, (v / max) * 100)}%` }}
+                        title={`${new Date(points[i].collectedAt).toLocaleString("en-US")}: $${v}`}
+                      />
+                    ))}
+                  </div>
+                  <small>{points.length} observations · USD / 1M tokens</small>
+                </article>
+              );
+            })}
+          </div>
+          <div className="historyTable">
+            <div className="historyHead">
+              <span>Collected</span>
+              <span>Model / provider</span>
+              <span>Input</span>
+              <span>Cache read</span>
+              <span>Output</span>
+              <span>Max change</span>
+            </div>
+            {visible.slice(0, 30).map((s) => (
+              <div className="historyRow" key={s.id}>
+                <time>
+                  {new Date(s.collectedAt).toLocaleString("en-US", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </time>
+                <span>
+                  <b>{s.model}</b>
+                  <small>{providerLabel(s.provider)}</small>
+                </span>
+                <code>{money(s.input, 3)}</code>
+                <code>{money(s.cached, 4)}</code>
+                <code>{money(s.output, 3)}</code>
+                <em className={(s.changePercent || 0) > 0 ? "moved" : "flat"}>
+                  {s.changePercent
+                    ? `${s.changePercent.toFixed(1)}%`
+                    : "No change"}
+                </em>
+              </div>
+            ))}
+          </div>
+          {!snapshots.length && (
+            <div className="historyState">
+              No snapshots yet. Run a manual price refresh to start history.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+function money(value: number | null, digits: number) {
+  return value == null ? "—" : `$${value.toFixed(digits)}`;
+}
+function SourceResults({
+  sources,
+  updates,
+  error,
+}: {
+  sources: FetchSource[];
+  updates: PriceUpdate[];
+  error: string;
+}) {
+  const evidence = updates.filter(
+    (u) => u.tier || u.currency || u.pricingRegion,
+  );
+  const verified = updates.filter(
+    (u) => u.verificationStatus === "verified",
+  ).length;
+  const retained = updates.filter(
+    (u) => u.verificationStatus === "previously_verified",
+  ).length;
+  return (
+    <div className="sourceResults">
+      {error ? (
+        <div className="fetchFailure">Refresh failed: {error}</div>
+      ) : (
+        <>
+          <div className="sourceSummary">
+            <b>
+              {sources.filter((s) => s.status === "ok").length}/{sources.length}
+            </b>{" "}
+            sources healthy
+            <span>
+              · {verified} verified now · {retained} retained from history
+            </span>
+          </div>
+          <div className="sourceChips">
+            {sources.map((s) => (
+              <a
+                href={s.url}
+                target="_blank"
+                rel="noreferrer"
+                title={s.detail}
+                className={s.status}
+                key={s.id}
+              >
+                <i />
+                {providerLabel(s.name)}
+                <small>
+                  {s.status === "ok"
+                    ? s.records
+                      ? `${s.records} updates`
+                      : "Verified"
+                    : s.status === "blocked"
+                      ? "Restricted"
+                      : s.status === "changed"
+                        ? "Parser review"
+                        : "Failed"}
+                </small>
+              </a>
+            ))}
+          </div>
+          {evidence.length > 0 && (
+            <div className="evidence">
+              <h4>PRICE BASIS FOR THIS REFRESH</h4>
+              {evidence.map((u) => (
+                <article key={`${u.model}-${u.provider}`}>
+                  <div>
+                    <b>{u.model}</b>
+                    <span>{providerLabel(u.provider)}</span>
+                  </div>
+                  <p>
+                    {u.pricingRegion && <em>{regionText(u.pricingRegion)}</em>}
+                    {u.tier && <em>{tierText(u.tier)}</em>}
+                    {u.discountPercent != null && u.discountPercent > 0 && (
+                      <em>{u.discountPercent}% discount</em>
+                    )}
+                  </p>
+                  {u.currency && u.currency !== "USD" && (
+                    <small>
+                      Native price: input {u.nativeInput} / output{" "}
+                      {u.nativeOutput} {u.currency} · USD conversion rate{" "}
+                      {u.fxRate?.toFixed(4)}
+                      {u.fxAsOf && ` (${u.fxAsOf})`}
+                    </small>
+                  )}
+                  {u.currency === "USD" && u.listInput != null && (
+                    <small>
+                      Current input / output: ${u.input} / ${u.output}; peak
+                      benchmark: ${u.listInput} / ${u.listOutput}
+                    </small>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+function fieldName(field: string) {
+  return (
+    (
+      {
+        input: "input price",
+        cached: "cache-read price",
+        write: "cache-write price",
+        output: "output price",
+      } as Record<string, string>
+    )[field] || field
+  );
+}
+function providerLabel(name: string) {
+  return (
+    (
+      {
+        "Anthropic 官方": "Anthropic Direct",
+        "OpenAI 官方": "OpenAI Direct",
+        "DeepSeek 官方": "DeepSeek Direct",
+        阿里云百炼: "Alibaba Cloud Model Studio",
+      } as Record<string, string>
+    )[name] || name
+  );
+}
+function regionLabel(region: string) {
+  return (
+    (
+      {
+        全球: "Global",
+        中国大陆: "Mainland China",
+        北美: "North America",
+        欧洲: "Europe",
+        亚太: "Asia Pacific",
+      } as Record<string, string>
+    )[region] || region
+  );
+}
+function tagLabel(tag: string) {
+  return (
+    (
+      {
+        "企业 SLA": "Enterprise SLA",
+        峰谷计价: "Time-of-day pricing",
+        待官网刷新: "Awaiting official refresh",
+        订阅额度: "Subscription allowance",
+        地区阶梯价: "Regional tiers",
+        "省 2%": "Save 2%",
+      } as Record<string, string>
+    )[tag] || tag
+  );
+}
+function regionText(text: string) {
+  return text.replace("中国大陆 · 华北2（北京）", "Mainland China · Beijing");
+}
+function tierText(text: string) {
+  return text.replace("峰值时段外", "outside peak hours");
+}

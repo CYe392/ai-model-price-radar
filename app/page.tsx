@@ -1375,9 +1375,9 @@ function CostCalculator({
     return { rate, total: afterCredits * (1 + Math.max(0, taxRate) / 100) };
   });
   function exportEstimate() {
-    const header = "model,provider,standard_input,cache_read,cache_write,output,fixed_fees,tax,monthly_total";
+    const header = "model,provider,standard_input,cache_read,cache_write,output,fixed_fees,tax,monthly_total,annual_total";
     const rows = ranked.map((r) =>
-      [r.m.name, providerLabel(r.p.name), r.standard, r.cached, r.cacheWrite, r.output, r.planFee + Math.max(0, extraMonthlyFee), r.tax, r.total]
+      [r.m.name, providerLabel(r.p.name), r.standard, r.cached, r.cacheWrite, r.output, r.planFee + Math.max(0, extraMonthlyFee), r.tax, r.total, r.total * 12]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
         .join(","),
     );
@@ -1480,7 +1480,7 @@ function CostCalculator({
           <strong>${best.toFixed(2)}</strong>
           <span>
             {ranked[0]
-              ? `${ranked[0].m.name} · ${providerLabel(ranked[0].p.name)}`
+              ? `${ranked[0].m.name} · ${providerLabel(ranked[0].p.name)} · $${(best * 12).toFixed(2)}/year`
               : "No route"}
           </span>
         </div>

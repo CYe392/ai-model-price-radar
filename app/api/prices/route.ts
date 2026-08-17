@@ -10,6 +10,7 @@ type PriceChange = { model:string;provider:string;field:string;before:number;aft
 
 const TARGETS = [
   { match: ["deepseek-v4-flash", "deepseek/v4-flash"], model: "DeepSeek V4 Flash" },
+  { match: ["deepseek-v4-pro", "deepseek/v4-pro"], model: "DeepSeek V4 Pro" },
   { match: ["qwen3.7-plus", "qwen/qwen3.7-plus"], model: "Qwen3.7 Plus" },
   { match: ["gemini-2.5-flash", "google/gemini-2.5-flash"], model: "Gemini 2.5 Flash" },
   { match: ["gpt-5-mini", "openai/gpt-5-mini"], model: "GPT-5 mini" },
@@ -112,7 +113,23 @@ function deepseekPrices(text:string):PriceUpdate[]{
   const hour=new Date().getUTCHours();
   const peak=(hour>=1&&hour<4)||(hour>=6&&hour<10);
   const i=peak?2:0;
-  return hit[i]!=null&&miss[i]!=null&&output[i]!=null?[{model:"DeepSeek V4 Flash",provider:"DeepSeek 官方",input:miss[i],cached:hit[i],output:output[i],source:"deepseek",currency:"USD",nativeInput:miss[i],nativeOutput:output[i],listInput:miss[2]??miss[i],listOutput:output[2]??output[i],discountPercent:peak?0:50,pricingRegion:"全球",tier:peak?"PEAK · 01:00–04:00 / 06:00–10:00 UTC":"OFF-PEAK · 峰值时段外"}]:[];
+  if(hit[i]==null||miss[i]==null||output[i]==null)return[];
+  const tier=peak?"PEAK · 01:00–04:00 / 06:00–10:00 UTC":"OFF-PEAK · 峰值时段外";
+  return [
+    {model:"DeepSeek V4 Flash",provider:"DeepSeek 官方",input:miss[i],cached:hit[i],output:output[i],source:"deepseek",currency:"USD",nativeInput:miss[i],nativeOutput:output[i],listInput:miss[2]??miss[i],listOutput:output[2]??output[i],discountPercent:peak?0:50,pricingRegion:"全球",tier},
+    {model:"DeepSeek V4 Pro",provider:"DeepSeek 官方",input:miss[i+1],cached:hit[i+1],output:output[i+1],source:"deepseek",currency:"USD",nativeInput:miss[i+1],nativeOutput:output[i+1],listInput:miss[3]??miss[i+1],listOutput:output[3]??output[i+1],discountPercent:peak?0:50,pricingRegion:"全球",tier},
+  ];
+}
+
+function togetherPrices(text:string):PriceUpdate[]{
+  const parse=(start:string,end:string,model:string)=>{const values=moneyList(section(text,start,end,700));return values.length>=3?{model,provider:"Together AI",input:values[0],cached:values[1],output:values[2],source:"together",currency:"USD",pricingRegion:"全球",tier:"Serverless · Standard"}:null};
+  const qwen=section(text,"Qwen3.7 Plus","Google Gemma",350).match(/\$\s*([0-9.]+)\s*-\s*\$\s*([0-9.]+)/);
+  return [parse("DeepSeek-V4-Pro","DeepSeek-V4-Flash","DeepSeek V4 Pro"),parse("DeepSeek-V4-Flash-0731","NVIDIA Nemotron","DeepSeek V4 Flash"),qwen?{model:"Qwen3.7 Plus",provider:"Together AI",input:+qwen[1],output:+qwen[2],source:"together",currency:"USD",pricingRegion:"全球",tier:"Serverless · Standard"}:null].filter((x):x is PriceUpdate=>x!==null);
+}
+
+function fireworksPrices(text:string):PriceUpdate[]{
+  const parse=(start:string,end:string,model:string)=>{const values=moneyList(section(text,start,end,500));return values.length>=3?{model,provider:"Fireworks AI",input:values[0],cached:values[1],output:values[2],source:"fireworks",currency:"USD",pricingRegion:"全球",tier:"Serverless · Standard"}:null};
+  return [parse("DeepSeek V4 Pro","DeepSeek V4 Flash","DeepSeek V4 Pro"),parse("DeepSeek V4 Flash (0731)","GLM 5.2","DeepSeek V4 Flash"),parse("Qwen 3.7 Plus","MiniMax M3","Qwen3.7 Plus")].filter((x):x is PriceUpdate=>x!==null);
 }
 
 async function deepseekPage():Promise<AdapterResult>{
@@ -192,6 +209,8 @@ export async function GET() {
     pricedPage("google","Google AI","https://ai.google.dev/gemini-api/docs/pricing",["Input price","Gemini 2.5 Flash","Context caching price"],googlePrices),
     deepseekPage(),
     qwenPage(),
+    pricedPage("together","Together AI","https://docs.together.ai/docs/serverless/models",["DeepSeek-V4-Pro","DeepSeek-V4-Flash-0731","Cached input"],togetherPrices),
+    pricedPage("fireworks","Fireworks AI","https://docs.fireworks.ai/serverless/pricing",["DeepSeek V4 Pro","DeepSeek V4 Flash","Cached input tokens"],fireworksPrices),
   ]);
   const results = adapters.map((r,i) => r.status === "fulfilled" ? r.value : { source: status(`adapter-${i}`,"未知来源","","error",String(r.reason)), updates: [] });
   const collectedAt = new Date().toISOString();

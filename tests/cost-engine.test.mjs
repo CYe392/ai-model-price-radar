@@ -17,7 +17,7 @@ test("supports service modes and cache sensitivity",()=>{
 });
 
 test("exports an auditable monthly and annual CSV breakdown",()=>{
-  assert.match(page,/model,provider,standard_input,cache_read,cache_write,output,fixed_fees,tax,monthly_total,annual_total/);
+  assert.match(page,/model,provider,region,availability,compliance,currency,standard_input,cache_read,cache_write,output,fixed_fees,tax,monthly_total,annual_total/);
   assert.match(page,/r\.total \* 12/);
   assert.match(page,/\/year/);
   assert.match(page,/modelscope-cost-estimate\.csv/);

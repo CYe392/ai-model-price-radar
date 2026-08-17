@@ -4,7 +4,7 @@ import { getDb } from "../../../db";
 import { collectionRuns, priceSnapshots, sourceChecks } from "../../../db/schema";
 
 type SourceStatus = { id: string; name: string; url: string; status: "ok" | "changed" | "blocked" | "error"; detail: string; checkedAt: string; records: number };
-type PriceUpdate = { model: string; provider: string; input?: number; cached?: number; write?: number; output?: number; source: string; currency?: string; nativeInput?: number; nativeOutput?: number; listInput?: number; listOutput?: number; discountPercent?: number; pricingRegion?: string; fxRate?: number; fxAsOf?: string; tier?: string };
+export type PriceUpdate = { model: string; provider: string; input?: number; cached?: number; write?: number; output?: number; source: string; currency?: string; nativeInput?: number; nativeOutput?: number; listInput?: number; listOutput?: number; discountPercent?: number; pricingRegion?: string; fxRate?: number; fxAsOf?: string; tier?: string };
 type AdapterResult = { source: SourceStatus; updates: PriceUpdate[] };
 type PriceChange = { model:string;provider:string;field:string;before:number;after:number;percent:number;direction:"up"|"down" };
 
@@ -46,11 +46,11 @@ function status(id: string, name: string, url: string, state: SourceStatus["stat
 async function jsonCatalog(id: string, name: string, url: string, provider: string): Promise<AdapterResult> {
   try {
     const response = await fetchWithTimeout(url, "application/json");
-    if (response.status === 403 || response.status === 429) return { source: status(id,name,url,"blocked",`官网返回 ${response.status}，已保留上次已知价格`), updates: [] };
+    if (response.status === 403 || response.status === 429) return { source: status(id,name,url,"blocked",`Official source returned ${response.status}; last known prices were retained.`), updates: [] };
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const body = await response.json() as { data?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
     const rows = Array.isArray(body) ? body : body.data;
-    if (!Array.isArray(rows)) return { source: status(id,name,url,"changed","JSON 结构变化，等待解析规则更新"), updates: [] };
+    if (!Array.isArray(rows)) return { source: status(id,name,url,"changed","The public catalog structure changed; no prices were written."), updates: [] };
     const updates: PriceUpdate[] = [];
     for (const target of TARGETS) {
       const row = rows.find(item => target.match.some(part => String(item.id ?? item.name ?? "").toLowerCase().includes(part)));
@@ -58,49 +58,37 @@ async function jsonCatalog(id: string, name: string, url: string, provider: stri
       const pricing = (row.pricing ?? row.cost ?? {}) as Record<string, unknown>;
       updates.push({ model: target.model, provider, input: dollars(pricing.prompt ?? pricing.input), cached: dollars(pricing.input_cache_read ?? pricing.cached_input ?? pricing.cache_read), write: dollars(pricing.input_cache_write ?? pricing.cache_write), output: dollars(pricing.completion ?? pricing.output), source: id });
     }
-    return { source: status(id,name,url,"ok",`成功解析 ${rows.length} 个公开模型条目`,updates.length), updates };
+    return { source: status(id,name,url,"ok",`Parsed ${rows.length} public model records.`,updates.length), updates };
   } catch (error) {
     return { source: status(id,name,url,"error",error instanceof Error ? error.message : "抓取失败"), updates: [] };
   }
 }
 
-function textOnly(html: string) { return html.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/&lt;/gi,"<").replace(/&gt;/gi,">").replace(/&le;/gi,"≤").replace(/&ge;/gi,"≥").replace(/&yen;/gi,"¥").replace(/&amp;/gi,"&").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/\s+/g," ").trim(); }
-
-async function publicPage(id: string, name: string, url: string, signatures: string[]): Promise<AdapterResult> {
-  try {
-    const response = await fetchWithTimeout(url);
-    if (response.status === 403 || response.status === 429) return { source: status(id,name,url,"blocked",`官网返回 ${response.status}；未绕过限制，保留上次已知价格`), updates: [] };
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const text = textOnly(await response.text()).toLowerCase();
-    const found = signatures.filter(x => text.includes(x.toLowerCase()));
-    if (found.length < Math.ceil(signatures.length / 2)) return { source: status(id,name,url,"changed","页面可访问，但关键字段发生变化，已标记人工复核"), updates: [] };
-    return { source: status(id,name,url,"ok",`公开定价页可访问；校验到 ${found.length}/${signatures.length} 个结构锚点`), updates: [] };
-  } catch (error) { return { source: status(id,name,url,"error",error instanceof Error ? error.message : "抓取失败"), updates: [] }; }
-}
+export function textOnly(html: string) { return html.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/&lt;/gi,"<").replace(/&gt;/gi,">").replace(/&le;/gi,"≤").replace(/&ge;/gi,"≥").replace(/&yen;/gi,"¥").replace(/&amp;/gi,"&").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/\s+/g," ").trim(); }
 
 async function pricedPage(id:string,name:string,url:string,signatures:string[],extract:(text:string)=>PriceUpdate[]):Promise<AdapterResult>{
   try{
     const response=await fetchWithTimeout(url);
-    if(response.status===403||response.status===429)return{source:status(id,name,url,"blocked",`官网返回 ${response.status}；保留上次可信价格`),updates:[]};
+    if(response.status===403||response.status===429)return{source:status(id,name,url,"blocked",`Official source returned ${response.status}; last trusted prices were retained.`),updates:[]};
     if(!response.ok)throw new Error(`HTTP ${response.status}`);
     const text=textOnly(await response.text());
     const found=signatures.filter(x=>text.toLowerCase().includes(x.toLowerCase()));
-    if(found.length<Math.ceil(signatures.length/2))return{source:status(id,name,url,"changed","关键字段缺失，解析器已停止写入"),updates:[]};
+    if(found.length<Math.ceil(signatures.length/2))return{source:status(id,name,url,"changed","Critical fields are missing; the parser stopped before writing prices."),updates:[]};
     const updates=extract(text).filter(u=>u.input!=null&&u.output!=null&&u.input>0&&u.output>0);
-    if(!updates.length)return{source:status(id,name,url,"changed","页面可访问，但目标价格行未通过完整性校验"),updates:[]};
-    return{source:status(id,name,url,"ok",`成功解析官方价格表，${updates.length} 条通过完整性校验`,updates.length),updates};
+    if(!updates.length)return{source:status(id,name,url,"changed","The page is reachable, but target price rows failed integrity checks."),updates:[]};
+    return{source:status(id,name,url,"ok",`Parsed the official price table; ${updates.length} records passed integrity checks.`,updates.length),updates};
   }catch(error){return{source:status(id,name,url,"error",error instanceof Error?error.message:"抓取失败"),updates:[]}}
 }
 
-function moneyList(text:string){return[...text.matchAll(/\$\s*([0-9]+(?:\.[0-9]+)?)/g)].map(m=>Number(m[1]));}
-function section(text:string,start:string,end:string,max=2400){const at=text.toLowerCase().indexOf(start.toLowerCase());if(at<0)return"";const tail=text.slice(at,at+max);const stop=tail.toLowerCase().indexOf(end.toLowerCase(),start.length);return stop>0?tail.slice(0,stop):tail;}
+export function moneyList(text:string){return[...text.matchAll(/\$\s*([0-9]+(?:\.[0-9]+)?)/g)].map(m=>Number(m[1]));}
+export function section(text:string,start:string,end:string,max=2400){const at=text.toLowerCase().indexOf(start.toLowerCase());if(at<0)return"";const tail=text.slice(at,at+max);const stop=tail.toLowerCase().indexOf(end.toLowerCase(),start.length);return stop>0?tail.slice(0,stop):tail;}
 
-function anthropicPrices(text:string):PriceUpdate[]{
+export function anthropicPrices(text:string):PriceUpdate[]{
   const row=section(text,"Claude Sonnet 4 ","Claude Haiku",700);
   const values=moneyList(row);
   return values.length>=5?[{model:"Claude 4 Sonnet",provider:"Anthropic 官方",input:values[0],write:values[1],cached:values[3],output:values[4],source:"anthropic"}]:[];
 }
-function googlePrices(text:string):PriceUpdate[]{
+export function googlePrices(text:string):PriceUpdate[]{
   const block=section(text,"Gemini 2.5 Flash","Gemini 2.5 Flash-Lite",2600);
   const standard=section(block,"Standard","Batch",1400);
   const input=standard.match(/Input price[^$]{0,120}\$\s*([0-9.]+)/i)?.[1];
@@ -108,29 +96,29 @@ function googlePrices(text:string):PriceUpdate[]{
   const cached=standard.match(/Context caching price[^$]{0,120}\$\s*([0-9.]+)/i)?.[1];
   return input&&output&&cached?[{model:"Gemini 2.5 Flash",provider:"Google AI",input:+input,cached:+cached,output:+output,source:"google"}]:[];
 }
-function deepseekPrices(text:string):PriceUpdate[]{
+export function deepseekPrices(text:string,utcHour=new Date().getUTCHours()):PriceUpdate[]{
   const block=section(text,"deepseek-v4-flash","Deduction Rules",2200);
   const hit=moneyList(section(block,"CACHE HIT","CACHE MISS",500));
   const miss=moneyList(section(block,"CACHE MISS","OUTPUT TOKENS",500));
   const output=moneyList(section(block,"OUTPUT TOKENS","Concurrency Limit",500));
-  const hour=new Date().getUTCHours();
+  const hour=utcHour;
   const peak=(hour>=1&&hour<4)||(hour>=6&&hour<10);
   const i=peak?2:0;
   if(hit[i]==null||miss[i]==null||output[i]==null)return[];
-  const tier=peak?"PEAK · 01:00–04:00 / 06:00–10:00 UTC":"OFF-PEAK · 峰值时段外";
+  const tier=peak?"PEAK · 01:00–04:00 / 06:00–10:00 UTC":"OFF-PEAK · outside peak hours";
   return [
     {model:"DeepSeek V4 Flash",provider:"DeepSeek 官方",input:miss[i],cached:hit[i],output:output[i],source:"deepseek",currency:"USD",nativeInput:miss[i],nativeOutput:output[i],listInput:miss[2]??miss[i],listOutput:output[2]??output[i],discountPercent:peak?0:50,pricingRegion:"全球",tier},
     {model:"DeepSeek V4 Pro",provider:"DeepSeek 官方",input:miss[i+1],cached:hit[i+1],output:output[i+1],source:"deepseek",currency:"USD",nativeInput:miss[i+1],nativeOutput:output[i+1],listInput:miss[3]??miss[i+1],listOutput:output[3]??output[i+1],discountPercent:peak?0:50,pricingRegion:"全球",tier},
   ];
 }
 
-function togetherPrices(text:string):PriceUpdate[]{
+export function togetherPrices(text:string):PriceUpdate[]{
   const parse=(start:string,end:string,model:string)=>{const values=moneyList(section(text,start,end,700));return values.length>=3?{model,provider:"Together AI",input:values[0],cached:values[1],output:values[2],source:"together",currency:"USD",pricingRegion:"全球",tier:"Serverless · Standard"}:null};
   const qwen=section(text,"Qwen3.7 Plus","Google Gemma",350).match(/\$\s*([0-9.]+)\s*-\s*\$\s*([0-9.]+)/);
   return [parse("Kimi K2.6","Z.ai","Kimi K2.6"),parse("GLM-5.2","OpenAI GPT-OSS","GLM 5.2"),parse("DeepSeek-V4-Pro","DeepSeek-V4-Flash","DeepSeek V4 Pro"),parse("DeepSeek-V4-Flash-0731","NVIDIA Nemotron","DeepSeek V4 Flash"),qwen?{model:"Qwen3.7 Plus",provider:"Together AI",input:+qwen[1],output:+qwen[2],source:"together",currency:"USD",pricingRegion:"全球",tier:"Serverless · Standard"}:null].filter((x):x is PriceUpdate=>x!==null);
 }
 
-function fireworksPrices(text:string):PriceUpdate[]{
+export function fireworksPrices(text:string):PriceUpdate[]{
   const parse=(start:string,end:string,model:string)=>{const values=moneyList(section(text,start,end,500));return values.length>=3?{model,provider:"Fireworks AI",input:values[0],cached:values[1],output:values[2],source:"fireworks",currency:"USD",pricingRegion:"全球",tier:"Serverless · Standard"}:null};
   return [parse("Kimi K2.6","Kimi K2.6 Fast","Kimi K2.6"),parse("DeepSeek V4 Pro","DeepSeek V4 Flash","DeepSeek V4 Pro"),parse("DeepSeek V4 Flash (0731)","GLM 5.2","DeepSeek V4 Flash"),parse("GLM 5.2","GLM 5.2 Fast","GLM 5.2"),parse("Qwen 3.7 Plus","MiniMax M3","Qwen3.7 Plus"),parse("MiniMax M3","MiniMax M2.7","MiniMax M3")].filter((x):x is PriceUpdate=>x!==null);
 }
@@ -149,7 +137,7 @@ async function deepseekPage():Promise<AdapterResult>{
     return{source:status(id,name,primary,"changed","主定价页与官方备用页面均缺少完整价格字段，已停止写入"),updates:[]};
   }catch(error){return{source:status(id,name,primary,"error",error instanceof Error?error.message:"抓取失败"),updates:[]}}
 }
-function qwenPrices(text:string,fxRate=7.2,fxAsOf="reference"):PriceUpdate[]{
+export function qwenPrices(text:string,fxRate=7.2,fxAsOf="reference"):PriceUpdate[]{
   const at=text.toLowerCase().indexOf("qwen3.7-plus");
   const block=at<0?"":text.slice(at,at+1200);
   const discount=block.match(/原价\s*([0-9.]+)\s*元\s*限时\s*([0-9.]+)\s*折[\s\S]{0,100}?原价\s*([0-9.]+)\s*元\s*限时\s*([0-9.]+)\s*折/);
@@ -159,19 +147,28 @@ function qwenPrices(text:string,fxRate=7.2,fxAsOf="reference"):PriceUpdate[]{
   return inputCny&&outputCny?[{model:"Qwen3.7 Plus",provider:"阿里云百炼",input:Math.round(inputCny/fxRate*1e6)/1e6,output:Math.round(outputCny/fxRate*1e6)/1e6,source:"qwen",currency:"CNY",nativeInput:inputCny,nativeOutput:outputCny,listInput:discount?+discount[1]:inputCny,listOutput:discount?+discount[3]:outputCny,discountPercent:discount?100-(+discount[2]*10):undefined,pricingRegion:"中国大陆 · 华北2（北京）",fxRate,fxAsOf,tier:"0<Token≤256K"}]:[];
 }
 
+export function openAIPrices(text:string):PriceUpdate[]{
+  const block=section(text,"GPT-5 mini","GPT-5 nano",1800);
+  if(!block)return[];
+  const input=block.match(/Input[^$]{0,100}\$\s*([0-9.]+)/i)?.[1];
+  const cached=block.match(/Cached input[^$]{0,100}\$\s*([0-9.]+)/i)?.[1];
+  const output=block.match(/Output[^$]{0,100}\$\s*([0-9.]+)/i)?.[1];
+  return input&&output?[{model:"GPT-5 mini",provider:"OpenAI 官方",input:+input,cached:cached?+cached:undefined,output:+output,source:"openai",currency:"USD",pricingRegion:"Global",tier:"Standard"}]:[];
+}
+
 async function qwenPage():Promise<AdapterResult>{
   const id="qwen",name="阿里云百炼",url="https://help.aliyun.com/zh/model-studio/model-pricing";
   try{
     const [page,fx]=await Promise.all([fetchWithTimeout(url),fetchWithTimeout("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml","application/xml")]);
-    if(page.status===403||page.status===429)return{source:status(id,name,url,"blocked",`官网返回 ${page.status}；保留上次可信价格`),updates:[]};
+    if(page.status===403||page.status===429)return{source:status(id,name,url,"blocked",`Official source returned ${page.status}; last trusted prices were retained.`),updates:[]};
     if(!page.ok)throw new Error(`HTTP ${page.status}`);
     const text=textOnly(await page.text());
     let fxRate=7.2,fxAsOf="reference";
-    if(fx.ok){const xml=await fx.text();const usd=xml.match(/currency=['\"]USD['\"] rate=['\"]([0-9.]+)/)?.[1];const cny=xml.match(/currency=['\"]CNY['\"] rate=['\"]([0-9.]+)/)?.[1];const date=xml.match(/time=['\"]([0-9-]+)/)?.[1];if(usd&&cny){fxRate=+cny/+usd;fxAsOf=date||"ECB daily"}}
+    if(fx.ok){const xml=await fx.text();const usd=xml.match(/currency=['"]USD['"] rate=['"]([0-9.]+)/)?.[1];const cny=xml.match(/currency=['"]CNY['"] rate=['"]([0-9.]+)/)?.[1];const date=xml.match(/time=['"]([0-9-]+)/)?.[1];if(usd&&cny){fxRate=+cny/+usd;fxAsOf=date||"ECB daily"}}
     const updates=qwenPrices(text,fxRate,fxAsOf);
-    if(!updates.length)return{source:status(id,name,url,"changed","页面可访问，但北京地域目标价格行未通过完整性校验"),updates:[]};
-    return{source:status(id,name,url,"ok",`解析北京地域促销价；原币种 CNY，ECB 汇率 ${fxRate.toFixed(4)}（${fxAsOf}）`,updates.length),updates};
-  }catch(error){return{source:status(id,name,url,"error",error instanceof Error?error.message:"抓取失败"),updates:[]}}
+    if(!updates.length)return{source:status(id,name,url,"changed","The Beijing-region target row failed integrity checks."),updates:[]};
+    return{source:status(id,name,url,"ok",`Parsed Beijing promotional pricing in CNY; ECB FX ${fxRate.toFixed(4)} (${fxAsOf}).`,updates.length),updates};
+  }catch(error){return{source:status(id,name,url,"error",error instanceof Error?error.message:"Collection failed"),updates:[]}}
 }
 
 function maxChange(previous: { input:number|null; cached:number|null; cacheWrite:number|null; output:number|null } | undefined, next: PriceUpdate) {
@@ -207,7 +204,7 @@ export async function GET() {
   const adapters = await Promise.allSettled([
     jsonCatalog("openrouter","OpenRouter","https://openrouter.ai/api/v1/models","OpenRouter"),
     jsonCatalog("opencode-go","OpenCode Go","https://opencode.ai/zen/go/v1/models","OpenCode Go"),
-    publicPage("openai","OpenAI","https://openai.com/api/pricing/",["cached input","input","output","gpt-5"]),
+    pricedPage("openai","OpenAI","https://openai.com/api/pricing/",["cached input","input","output","gpt-5 mini"],openAIPrices),
     pricedPage("anthropic","Anthropic","https://platform.claude.com/docs/en/about-claude/pricing",["Base Input Tokens","Cache Hits & Refreshes","Claude Sonnet 4"],anthropicPrices),
     pricedPage("google","Google AI","https://ai.google.dev/gemini-api/docs/pricing",["Input price","Gemini 2.5 Flash","Context caching price"],googlePrices),
     deepseekPage(),

@@ -13,6 +13,7 @@ AI API price intelligence dashboard that compares official pricing, cache econom
 - Responsive English interface designed for North American and European users
 - Versioned read-only JSON API, OpenAPI 3.1 document, and embeddable price table
 - Browser-local team workspace with governance presets, budget guardrails, decision records, audit history, and portable JSON handoff
+- Browser-local personalization with English/Chinese core UI, adaptive themes, density controls, reduced motion, high contrast, keyboard focus, and print support
 
 No provider accounts or paid inference APIs are required for collection. Provider billing pages remain authoritative.
 

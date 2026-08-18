@@ -174,6 +174,16 @@ type DecisionRecord = {
   confidence: string;
 };
 type AuditEntry = { id: string; at: string; action: string };
+type UiLanguage = "en" | "zh";
+type UiTheme = "system" | "light" | "dark";
+type UiDensity = "comfortable" | "compact";
+type UiPreferences = {
+  language: UiLanguage;
+  theme: UiTheme;
+  density: UiDensity;
+  reducedMotion: boolean;
+  highContrast: boolean;
+};
 type WorkspaceState = {
   name: string;
   organization: string;
@@ -194,6 +204,84 @@ const DEFAULT_WORKSPACE: WorkspaceState = {
   decisions: [],
   audit: [],
 };
+const DEFAULT_PREFERENCES: UiPreferences = {
+  language: "en",
+  theme: "system",
+  density: "comfortable",
+  reducedMotion: false,
+  highContrast: false,
+};
+const UI_COPY = {
+  en: {
+    skip: "Skip to main content",
+    nav: ["Price explorer", "Calculator", "History", "Data health", "Market brief", "Alerts", "Workspace", "Preferences", "API finder"],
+    developers: "Developers ↗",
+    online: "Public sources online",
+    openHealth: "Open data health",
+    heroLabel: "AI API MARKET INTELLIGENCE",
+    heroLine1: "Compare AI APIs.",
+    heroLine2: "Spend smarter.",
+    heroBody1: "Official pricing, cache economics, regional availability, and practical recommendations.",
+    heroBody2: "Shortlist the right route without opening an account with every provider.",
+    coverage: "Public price coverage",
+    coverageSub: "Provider pages & catalogs",
+    providers: "Providers & routers",
+    routes: "Models & routes",
+    regions: "Regional views",
+    tabs: ["Live pricing", "Cost calculator", "Price history", "Data health", "Market brief", "Price alerts", "Workspace", "Preferences", "Recommendations"],
+    updatePrefix: "Public provider pricing · Updated:",
+    checking: "Checking official sources",
+    refresh: "Refresh prices",
+    noAccounts: "No provider accounts required",
+    sourceNote: "Every route shows whether its price was verified now, retained from a previous verification, or included as reference data. Official billing pages remain authoritative.",
+    search: "Search models or providers...",
+    region: "Region",
+    availability: "Availability",
+    compliance: "Compliance",
+    sort: "Sort by",
+    currency: "Currency",
+    planningFx: "per 1M tokens · planning FX",
+    footerTitle: "ModelScope · AI API market intelligence",
+    footerNote: "Public prices may include promotions, tiers, and regional conditions. Provider billing pages remain authoritative.",
+    toastTitle: "Public pricing refresh complete",
+    toastBody: "Routes, regions, and market changes are up to date",
+  },
+  zh: {
+    skip: "跳到主要内容",
+    nav: ["价格查询", "成本计算", "价格历史", "数据健康", "最新动态", "价格提醒", "工作区", "界面偏好", "API 推荐"],
+    developers: "开发者 ↗",
+    online: "公开价格来源在线",
+    openHealth: "打开数据健康页",
+    heroLabel: "AI API 市场情报",
+    heroLine1: "比较 AI API，",
+    heroLine2: "更聪明地花钱。",
+    heroBody1: "聚合官方价格、缓存经济性、地区可用性和实用推荐。",
+    heroBody2: "无需注册每一家服务商，也能快速筛选合适路线。",
+    coverage: "公开价格覆盖",
+    coverageSub: "服务商价格页与公开目录",
+    providers: "服务商与路由商",
+    routes: "模型与路线",
+    regions: "地区视图",
+    tabs: ["实时价格", "成本计算", "价格历史", "数据健康", "最新动态", "价格提醒", "工作区", "界面偏好", "场景推荐"],
+    updatePrefix: "公开服务商价格 · 更新时间：",
+    checking: "正在检查官网",
+    refresh: "手动刷新价格",
+    noAccounts: "无需服务商账户",
+    sourceNote: "每条路线都会标明价格是刚刚核验、来自此前核验，还是仅供参考。最终计费以服务商官网为准。",
+    search: "搜索模型或服务商……",
+    region: "用户地区",
+    availability: "可用阶段",
+    compliance: "合规要求",
+    sort: "排序方式",
+    currency: "显示货币",
+    planningFx: "每百万 token · 规划汇率",
+    footerTitle: "ModelScope · AI API 市场情报",
+    footerNote: "公开价格可能包含促销、阶梯和地区条件；最终计费以服务商官网为准。",
+    toastTitle: "公开价格刷新完成",
+    toastBody: "路线、地区和市场变化已更新",
+  },
+} as const;
+type UiCopy = (typeof UI_COPY)[UiLanguage];
 type HistorySnapshot = {
   id: number;
   collectedAt: string;
@@ -972,7 +1060,9 @@ export default function Home() {
     [briefCategory, setBriefCategory] = useState("all"),
     [briefSeverity, setBriefSeverity] = useState("all");
   const [workspace, setWorkspace] = useState<WorkspaceState>(DEFAULT_WORKSPACE),
-    [workspaceLoaded, setWorkspaceLoaded] = useState(false);
+    [workspaceLoaded, setWorkspaceLoaded] = useState(false),
+    [preferences, setPreferences] = useState<UiPreferences>(DEFAULT_PREFERENCES),
+    [preferencesLoaded, setPreferencesLoaded] = useState(false);
   useEffect(() => {
     try {
       setAlerts(JSON.parse(localStorage.getItem("modelscope-alert-rules") || "[]"));
@@ -1003,6 +1093,36 @@ export default function Home() {
     if (workspaceLoaded)
       localStorage.setItem("modelscope-team-workspace", JSON.stringify(workspace));
   }, [workspace, workspaceLoaded]);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("modelscope-ui-preferences");
+      if (saved) setPreferences({ ...DEFAULT_PREFERENCES, ...JSON.parse(saved) });
+    } catch {
+      setPreferences(DEFAULT_PREFERENCES);
+    } finally {
+      setPreferencesLoaded(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (preferencesLoaded)
+      localStorage.setItem("modelscope-ui-preferences", JSON.stringify(preferences));
+    const root = document.documentElement;
+    const colorQuery = globalThis.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => {
+      const resolved = preferences.theme === "system"
+        ? colorQuery.matches ? "dark" : "light"
+        : preferences.theme;
+      root.dataset.theme = resolved;
+      root.style.colorScheme = resolved;
+    };
+    root.lang = preferences.language === "zh" ? "zh-CN" : "en";
+    root.dataset.density = preferences.density;
+    root.dataset.motion = preferences.reducedMotion ? "reduced" : "full";
+    root.dataset.contrast = preferences.highContrast ? "high" : "standard";
+    applyTheme();
+    colorQuery.addEventListener("change", applyTheme);
+    return () => colorQuery.removeEventListener("change", applyTheme);
+  }, [preferences, preferencesLoaded]);
   useEffect(() => {
     if (!["history", "health"].includes(tab) || historyLoaded) return;
     setHistoryBusy(true);
@@ -1335,25 +1455,32 @@ export default function Home() {
     }));
     setTab("workspace");
   }
+  const copy = UI_COPY[preferences.language];
   return (
-    <main>
-      <Header tab={tab} setTab={setTab} />
-      <Hero models={liveModels} />
-      <section className="panel wrap">
+    <main aria-busy={busy}>
+      <a className="skipLink" href="#main-content">{copy.skip}</a>
+      <Header tab={tab} setTab={setTab} copy={copy} />
+      <Hero models={liveModels} copy={copy} />
+      <section className="panel wrap" id="main-content" role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={-1}>
         <div className="panelTop">
-          <div className="tabs">
+          <div className="tabs" role="tablist" aria-label={preferences.language === "zh" ? "主要工具" : "Primary tools"}>
             {[
-              ["prices", "◫", "Live pricing"],
-              ["calculator", "$", "Cost calculator"],
-              ["history", "↗", "Price history"],
-              ["health", "●", "Data health"],
-              ["brief", "≡", "Market brief"],
-              ["alerts", "!", "Price alerts"],
-              ["workspace", "▦", "Workspace"],
-              ["recommend", "◇", "Recommendations"],
+              ["prices", "◫", copy.tabs[0]],
+              ["calculator", "$", copy.tabs[1]],
+              ["history", "↗", copy.tabs[2]],
+              ["health", "●", copy.tabs[3]],
+              ["brief", "≡", copy.tabs[4]],
+              ["alerts", "!", copy.tabs[5]],
+              ["workspace", "▦", copy.tabs[6]],
+              ["preferences", "◐", copy.tabs[7]],
+              ["recommend", "◇", copy.tabs[8]],
             ].map((x) => (
               <button
                 key={x[0]}
+                id={`tab-${x[0]}`}
+                role="tab"
+                aria-selected={tab === x[0]}
+                aria-controls="main-content"
                 className={tab === x[0] ? "on" : ""}
                 onClick={() => setTab(x[0])}
               >
@@ -1366,20 +1493,17 @@ export default function Home() {
             ))}
           </div>
           <div className="refresh">
-            <small>Public provider pricing · Updated: {updated}</small>
-            <button onClick={refresh} disabled={busy}>
+            <small aria-live="polite">{copy.updatePrefix} {updated}</small>
+            <button onClick={refresh} disabled={busy} aria-label={busy ? copy.checking : copy.refresh}>
               <b className={busy ? "spin" : ""}>↻</b>
-              {busy ? "Checking official sources" : "Refresh prices"}
+              {busy ? copy.checking : copy.refresh}
             </button>
           </div>
         </div>
         {tab === "prices" && (
           <>
             <div className="sourceNote">
-              <b>No provider accounts required</b> Every route shows whether its
-              price was verified now, retained from a previous verification, or
-              included as reference data. Official billing pages remain
-              authoritative.
+              <b>{copy.noAccounts}</b> {copy.sourceNote}
             </div>
             <div className="filters">
               <label>
@@ -1387,17 +1511,18 @@ export default function Home() {
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search models or providers..."
+                  aria-label={copy.search}
+                  placeholder={copy.search}
                 />
               </label>
               <Filter
-                label="Region"
+                label={copy.region}
                 value={region}
                 set={(v) => setRegion(v as Region)}
-                options={regionOptions.map((r) => `${r}|${regionLabel(r)}`)}
+                options={regionOptions.map((r) => `${r}|${preferences.language === "zh" ? r : regionLabel(r)}`)}
               />
               <Filter
-                label="Availability"
+                label={copy.availability}
                 value={availabilityStage}
                 set={(v) => setAvailabilityStage(v as AvailabilityStage)}
                 options={[
@@ -1408,7 +1533,7 @@ export default function Home() {
                 ]}
               />
               <Filter
-                label="Compliance"
+                label={copy.compliance}
                 value={compliance}
                 set={(v) => setCompliance(v as ComplianceFilter)}
                 options={[
@@ -1421,7 +1546,7 @@ export default function Home() {
                 ]}
               />
               <Filter
-                label="Sort by"
+                label={copy.sort}
                 value={sort}
                 set={setSort}
                 options={[
@@ -1432,12 +1557,12 @@ export default function Home() {
                 ]}
               />
               <Filter
-                label="Currency"
+                label={copy.currency}
                 value={currency}
                 set={(v) => setCurrency(v as Currency)}
                 options={["USD", "EUR", "GBP", "CNY", "JPY", "AUD"]}
               />
-              <small>{currency} per 1M tokens · planning FX</small>
+              <small>{currency} {copy.planningFx}</small>
             </div>
             <div className="regionIntel">
               <div>
@@ -1834,6 +1959,16 @@ export default function Home() {
             onApplyPreset={applyGovernancePreset}
           />
         )}
+        {tab === "preferences" && (
+          <PreferencesCenter
+            preferences={preferences}
+            setPreferences={setPreferences}
+            region={region}
+            setRegion={setRegion}
+            currency={currency}
+            setCurrency={setCurrency}
+          />
+        )}
         {tab === "calculator" && (
           <CostCalculator
             models={liveModels}
@@ -1873,18 +2008,15 @@ export default function Home() {
         )}
       </section>
       <footer className="wrap">
-        <span>ModelScope · AI API market intelligence</span>
-        <span>
-          Public prices may include promotions, tiers, and regional conditions.
-          Provider billing pages remain authoritative.
-        </span>
+        <span>{copy.footerTitle}</span>
+        <span>{copy.footerNote}</span>
       </footer>
       {toast && (
-        <div className="toast">
+        <div className="toast" role="status" aria-live="assertive">
           <i>✓</i>
           <span>
-            <b>Public pricing refresh complete</b>
-            <small>Routes, regions, and market changes are up to date</small>
+            <b>{copy.toastTitle}</b>
+            <small>{copy.toastBody}</small>
           </span>
         </div>
       )}
@@ -1918,7 +2050,7 @@ function Filter({
     </span>
   );
 }
-function Header({ tab, setTab }: { tab: string; setTab: (v: string) => void }) {
+function Header({ tab, setTab, copy }: { tab: string; setTab: (v: string) => void; copy: UiCopy }) {
   return (
     <header>
       <a className="brand" href="#">
@@ -1926,30 +2058,32 @@ function Header({ tab, setTab }: { tab: string; setTab: (v: string) => void }) {
       </a>
       <nav>
         {[
-          ["prices", "Price explorer"],
-          ["calculator", "Calculator"],
-          ["history", "History"],
-          ["health", "Data health"],
-          ["brief", "Market brief"],
-          ["alerts", "Alerts"],
-          ["workspace", "Workspace"],
-          ["recommend", "API finder"],
+          ["prices", copy.nav[0]],
+          ["calculator", copy.nav[1]],
+          ["history", copy.nav[2]],
+          ["health", copy.nav[3]],
+          ["brief", copy.nav[4]],
+          ["alerts", copy.nav[5]],
+          ["workspace", copy.nav[6]],
+          ["preferences", copy.nav[7]],
+          ["recommend", copy.nav[8]],
         ].map((x) => (
           <button
             key={x[0]}
             className={tab === x[0] ? "on" : ""}
             onClick={() => setTab(x[0])}
+            aria-current={tab === x[0] ? "page" : undefined}
           >
             {x[1]}
           </button>
         ))}
-        <a className="navExternal" href="/api-docs">Developers ↗</a>
+        <a className="navExternal" href="/api-docs">{copy.developers}</a>
       </nav>
       <div className="health">
-        <i /> Public sources online{" "}
+        <i /> {copy.online}{" "}
         <button
-          aria-label="Open data health"
-          title="Data health"
+          aria-label={copy.openHealth}
+          title={copy.nav[3]}
           onClick={() => setTab("health")}
         >
           ●
@@ -1958,7 +2092,7 @@ function Header({ tab, setTab }: { tab: string; setTab: (v: string) => void }) {
     </header>
   );
 }
-function Hero({ models }: { models: M[] }) {
+function Hero({ models, copy }: { models: M[]; copy: UiCopy }) {
   const providers = new Set(
       models.flatMap((m) => m.providers.map((p) => p.name)),
     ).size,
@@ -1966,24 +2100,22 @@ function Hero({ models }: { models: M[] }) {
   return (
     <section className="hero wrap">
       <div>
-        <b>AI API MARKET INTELLIGENCE</b>
+        <b>{copy.heroLabel}</b>
         <h1>
-          Compare AI APIs.
+          {copy.heroLine1}
           <br />
-          <em>Spend smarter.</em>
+          <em>{copy.heroLine2}</em>
         </h1>
         <p>
-          Official pricing, cache economics, regional availability, and
-          practical recommendations.
+          {copy.heroBody1}
           <br />
-          Shortlist the right route without opening an account with every
-          provider.
+          {copy.heroBody2}
         </p>
       </div>
       <div className="heroCard">
         <div className="chartTitle">
-          <span>Public price coverage</span>
-          <small>Provider pages & catalogs</small>
+          <span>{copy.coverage}</span>
+          <small>{copy.coverageSub}</small>
         </div>
         <div className="bars">
           {[55, 68, 46, 82, 64, 91, 74, 58, 70, 49, 62, 44].map((h, i) => (
@@ -1993,15 +2125,15 @@ function Hero({ models }: { models: M[] }) {
         <div className="stats">
           <div>
             <strong>{providers}</strong>
-            <small>Providers & routers</small>
+            <small>{copy.providers}</small>
           </div>
           <div>
             <strong>{routes}</strong>
-            <small>Models & routes</small>
+            <small>{copy.routes}</small>
           </div>
           <div>
             <strong>{regionOptions.length}</strong>
-            <small>Regional views</small>
+            <small>{copy.regions}</small>
           </div>
         </div>
       </div>
@@ -2184,6 +2316,119 @@ function verificationLabel(status: VerificationStatus) {
     reference: "REFERENCE",
     quarantined: "QUARANTINED",
   }[status];
+}
+function PreferencesCenter({
+  preferences,
+  setPreferences,
+  region,
+  setRegion,
+  currency,
+  setCurrency,
+}: {
+  preferences: UiPreferences;
+  setPreferences: Dispatch<SetStateAction<UiPreferences>>;
+  region: Region;
+  setRegion: (region: Region) => void;
+  currency: Currency;
+  setCurrency: (currency: Currency) => void;
+}) {
+  const zh = preferences.language === "zh";
+  const text = zh
+    ? {
+        label: "界面与无障碍",
+        title: "按你的工作方式调整工具",
+        sub: "语言、主题、密度和辅助功能会立即生效，并且只保存在当前浏览器。",
+        language: "界面语言",
+        appearance: "外观主题",
+        system: "跟随系统",
+        light: "浅色",
+        dark: "深色",
+        density: "信息密度",
+        comfortable: "舒适",
+        compact: "紧凑",
+        defaults: "区域默认值",
+        region: "用户地区",
+        currency: "显示货币",
+        accessibility: "辅助功能",
+        motion: "减少界面动画",
+        motionSub: "关闭旋转、浮动和过渡动画",
+        contrast: "高对比度",
+        contrastSub: "加强边框、焦点与文本对比",
+        privacy: "这些偏好不会上传，也不会触发价格刷新。手动刷新规则保持不变。",
+        reset: "恢复默认显示",
+        preview: "当前配置",
+      }
+    : {
+        label: "INTERFACE & ACCESSIBILITY",
+        title: "Make the tool work your way",
+        sub: "Language, theme, density, and assistive settings apply instantly and stay only in this browser.",
+        language: "Interface language",
+        appearance: "Appearance theme",
+        system: "Use system",
+        light: "Light",
+        dark: "Dark",
+        density: "Information density",
+        comfortable: "Comfortable",
+        compact: "Compact",
+        defaults: "Regional defaults",
+        region: "User region",
+        currency: "Display currency",
+        accessibility: "Accessibility",
+        motion: "Reduce interface motion",
+        motionSub: "Disables spinning, lifting, and transition effects",
+        contrast: "High contrast",
+        contrastSub: "Strengthens borders, focus indicators, and text contrast",
+        privacy: "These preferences are never uploaded and never trigger a price refresh. Manual refresh behavior is unchanged.",
+        reset: "Reset display defaults",
+        preview: "Current setup",
+      };
+  const themes: [UiTheme, string, string][] = [
+    ["system", text.system, "◐"],
+    ["light", text.light, "☀"],
+    ["dark", text.dark, "●"],
+  ];
+  const densities: [UiDensity, string][] = [
+    ["comfortable", text.comfortable],
+    ["compact", text.compact],
+  ];
+  return (
+    <div className="preferencesCenter">
+      <Title label={text.label} title={text.title} sub={text.sub} />
+      <div className="preferencePrivacy" role="note"><b>LOCAL</b><span>{text.privacy}</span></div>
+      <div className="preferenceGrid">
+        <section>
+          <div className="preferenceTitle"><b>{text.language}</b><span>EN / 中文</span></div>
+          <div className="segmented" role="group" aria-label={text.language}>
+            <button aria-pressed={preferences.language === "en"} className={preferences.language === "en" ? "selected" : ""} onClick={() => setPreferences((current) => ({ ...current, language: "en" }))}>English</button>
+            <button aria-pressed={preferences.language === "zh"} className={preferences.language === "zh" ? "selected" : ""} onClick={() => setPreferences((current) => ({ ...current, language: "zh" }))}>中文</button>
+          </div>
+        </section>
+        <section>
+          <div className="preferenceTitle"><b>{text.appearance}</b><span>{preferences.theme}</span></div>
+          <div className="themeChoices">
+            {themes.map(([theme, label, icon]) => <button key={theme} aria-pressed={preferences.theme === theme} className={preferences.theme === theme ? "selected" : ""} onClick={() => setPreferences((current) => ({ ...current, theme }))}><i>{icon}</i><span>{label}</span></button>)}
+          </div>
+        </section>
+        <section>
+          <div className="preferenceTitle"><b>{text.density}</b><span>{preferences.density}</span></div>
+          <div className="densityChoices">
+            {densities.map(([density, label]) => <button key={density} aria-pressed={preferences.density === density} className={preferences.density === density ? "selected" : ""} onClick={() => setPreferences((current) => ({ ...current, density }))}><i>{density === "compact" ? "≡" : "☷"}</i><span>{label}</span></button>)}
+          </div>
+        </section>
+        <section>
+          <div className="preferenceTitle"><b>{text.defaults}</b><span>{regionLabel(region)} · {currency}</span></div>
+          <label>{text.region}<select value={region} onChange={(event) => setRegion(event.target.value as Region)}>{regionOptions.map((item) => <option key={item} value={item}>{zh ? item : regionLabel(item)}</option>)}</select></label>
+          <label>{text.currency}<select value={currency} onChange={(event) => setCurrency(event.target.value as Currency)}>{["USD", "EUR", "GBP", "CNY", "JPY", "AUD"].map((item) => <option key={item}>{item}</option>)}</select></label>
+        </section>
+      </div>
+      <section className="accessibilitySettings">
+        <div className="preferenceTitle"><b>{text.accessibility}</b><span>WCAG-oriented controls</span></div>
+        <label htmlFor="reduced-motion"><input id="reduced-motion" aria-label={text.motion} type="checkbox" checked={preferences.reducedMotion} onChange={(event) => setPreferences((current) => ({ ...current, reducedMotion: event.target.checked }))} /><span><b>{text.motion}</b><small>{text.motionSub}</small></span></label>
+        <label htmlFor="high-contrast"><input id="high-contrast" aria-label={text.contrast} type="checkbox" checked={preferences.highContrast} onChange={(event) => setPreferences((current) => ({ ...current, highContrast: event.target.checked }))} /><span><b>{text.contrast}</b><small>{text.contrastSub}</small></span></label>
+        <div className="preferenceSummary"><b>{text.preview}</b><span>{preferences.language.toUpperCase()} · {preferences.theme} · {preferences.density} · {regionLabel(region)} · {currency}</span><button onClick={() => { setPreferences(DEFAULT_PREFERENCES); setRegion("全球"); setCurrency("USD"); }}>{text.reset}</button></div>
+      </section>
+    </div>
+  );
 }
 function WorkspaceCenter({
   workspace,

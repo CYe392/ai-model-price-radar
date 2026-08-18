@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.8.0 — Personalization and accessibility
+
+- Added a browser-local preference center for English or Chinese core UI, system/light/dark themes, comfortable/compact density, reduced motion, and high contrast.
+- Added synchronized user-region and display-currency defaults without triggering collection or changing the manual-refresh rule.
+- Added skip-to-content navigation, visible keyboard focus, tab semantics, live status announcements, explicit control names, and native document-language updates.
+- Added responsive preference layouts, smaller-screen refresh improvements, OS-level reduced-motion support, and a print-friendly comparison view.
+- Kept English as the default interface for North American and European users while making the core navigation, hero, pricing controls, status, and notices bilingual.
+
 ## v1.7.0 — Private workspace and governance
 
 - Added a browser-local workspace for team responsibility roles, recommendation decisions, and an auditable action history.

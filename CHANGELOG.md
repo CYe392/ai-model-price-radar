@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.1 — Security and maintenance release
+
+- Updated React, the React Server Components runtime, Vinext, Vite, Cloudflare tooling, Tailwind, and related build dependencies to patched compatible versions.
+- Kept ESLint on the supported v9 line and TypeScript on v5 to avoid incompatible grouped major upgrades.
+- Upgraded GitHub Actions to the current Node 24 based action releases.
+- Split weekly dependency updates into production, Cloudflare, lint, TypeScript, and GitHub Actions groups so failures stay isolated and reviewable.
+- Preserved the product contract and data model; this release changes maintenance infrastructure rather than user-facing pricing behavior.
+
 ## v2.0.0 — Complete product launch
 
 - Added a guided four-step onboarding journey and homepage calls to action that deep-link into recommendations, workspace governance, prices, and the cost calculator.

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./newsletter.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://modelscope-price-radar.cybercl19.chatgpt.site"),
   title: { default: "ModelScope | AI API Price Intelligence", template: "%s | ModelScope" },

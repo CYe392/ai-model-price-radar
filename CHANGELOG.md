@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.0 — Email updates and publishing foundation
+
+- Added region-aware, double-opt-in email subscriptions backed by Cloudflare D1, with durable consent, confirmation, unsubscribe, and delivery state.
+- Added one-click unsubscribe headers and provider-neutral queued delivery, with optional Resend delivery configured entirely through server secrets.
+- Added an authenticated, manually triggered publication sender with duplicate-delivery protection and a bounded batch size.
+- Added permanent update index and detail pages so product, methodology, and data-trust briefs can be linked, revisited, and cited.
+- Expanded the privacy notice and operational documentation for subscriber data, delivery configuration, deletion, and failure handling.
+- Preserved manual-only provider price collection: subscriptions and email delivery never trigger source fetching.
+
 ## v2.0.1 — Security and maintenance release
 
 - Updated React, the React Server Components runtime, Vinext, Vite, Cloudflare tooling, Tailwind, and related build dependencies to patched compatible versions.

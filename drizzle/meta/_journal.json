@@ -29,6 +29,13 @@
       "when": 1787007600000,
       "tag": "0003_price_provenance",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787043600000,
+      "tag": "0004_newsletter",
+      "breakpoints": true
     }
   ]
 }

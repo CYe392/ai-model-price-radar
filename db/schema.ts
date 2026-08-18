@@ -4,6 +4,7 @@ import {
   real,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 export const priceSnapshots = sqliteTable(
@@ -71,5 +72,58 @@ export const sourceChecks = sqliteTable(
   (table) => [
     index("idx_source_checks_source_time").on(table.sourceId, table.checkedAt),
     index("idx_source_checks_checked_at").on(table.checkedAt),
+  ],
+);
+
+export const newsletterSubscribers = sqliteTable(
+  "newsletter_subscribers",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    email: text("email").notNull(),
+    emailNormalized: text("email_normalized").notNull(),
+    locale: text("locale").notNull().default("en"),
+    region: text("region").notNull().default("global"),
+    status: text("status").notNull().default("pending"),
+    confirmationTokenHash: text("confirmation_token_hash"),
+    unsubscribeToken: text("unsubscribe_token").notNull(),
+    consentSource: text("consent_source").notNull().default("updates-page"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    confirmedAt: text("confirmed_at"),
+    unsubscribedAt: text("unsubscribed_at"),
+  },
+  (table) => [
+    uniqueIndex("uq_newsletter_subscribers_email").on(table.emailNormalized),
+    uniqueIndex("uq_newsletter_subscribers_confirmation_token").on(
+      table.confirmationTokenHash,
+    ),
+    uniqueIndex("uq_newsletter_subscribers_unsubscribe_token").on(
+      table.unsubscribeToken,
+    ),
+    index("idx_newsletter_subscribers_status").on(table.status),
+  ],
+);
+
+export const newsletterDeliveries = sqliteTable(
+  "newsletter_deliveries",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    subscriberId: integer("subscriber_id")
+      .notNull()
+      .references(() => newsletterSubscribers.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    publicationSlug: text("publication_slug"),
+    status: text("status").notNull().default("pending"),
+    providerMessageId: text("provider_message_id"),
+    error: text("error"),
+    createdAt: text("created_at").notNull(),
+    sentAt: text("sent_at"),
+  },
+  (table) => [
+    index("idx_newsletter_deliveries_status_created").on(
+      table.status,
+      table.createdAt,
+    ),
+    index("idx_newsletter_deliveries_subscriber").on(table.subscriberId),
   ],
 );

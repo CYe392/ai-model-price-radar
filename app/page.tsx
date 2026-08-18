@@ -223,6 +223,8 @@ const UI_COPY = {
     heroLine2: "Spend smarter.",
     heroBody1: "Official pricing, cache economics, regional availability, and practical recommendations.",
     heroBody2: "Shortlist the right route without opening an account with every provider.",
+    heroPrimary: "Find my API",
+    heroSecondary: "How it works",
     coverage: "Public price coverage",
     coverageSub: "Provider pages & catalogs",
     providers: "Providers & routers",
@@ -257,6 +259,8 @@ const UI_COPY = {
     heroLine2: "更聪明地花钱。",
     heroBody1: "聚合官方价格、缓存经济性、地区可用性和实用推荐。",
     heroBody2: "无需注册每一家服务商，也能快速筛选合适路线。",
+    heroPrimary: "帮我推荐 API",
+    heroSecondary: "查看使用方法",
     coverage: "公开价格覆盖",
     coverageSub: "服务商价格页与公开目录",
     providers: "服务商与路由商",
@@ -1150,6 +1154,11 @@ export default function Home() {
       )
       .finally(() => setHistoryBusy(false));
   }, [tab, historyLoaded]);
+  useEffect(() => {
+    const requestedView = new URLSearchParams(globalThis.location.search).get("view");
+    if (["prices", "calculator", "history", "health", "brief", "alerts", "workspace", "preferences", "recommend"].includes(requestedView ?? ""))
+      setTab(requestedView as string);
+  }, []);
   const available = (p: P) =>
     routeAvailable(p, region, availabilityStage) &&
     routeMatchesCompliance(p, compliance);
@@ -1460,7 +1469,7 @@ export default function Home() {
     <main aria-busy={busy}>
       <a className="skipLink" href="#main-content">{copy.skip}</a>
       <Header tab={tab} setTab={setTab} copy={copy} />
-      <Hero models={liveModels} copy={copy} />
+      <Hero models={liveModels} copy={copy} onStart={(view) => setTab(view)} />
       <section className="panel wrap" id="main-content" role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={-1}>
         <div className="panelTop">
           <div className="tabs" role="tablist" aria-label={preferences.language === "zh" ? "主要工具" : "Primary tools"}>
@@ -2093,7 +2102,7 @@ function Header({ tab, setTab, copy }: { tab: string; setTab: (v: string) => voi
     </header>
   );
 }
-function Hero({ models, copy }: { models: M[]; copy: UiCopy }) {
+function Hero({ models, copy, onStart }: { models: M[]; copy: UiCopy; onStart: (view: string) => void }) {
   const providers = new Set(
       models.flatMap((m) => m.providers.map((p) => p.name)),
     ).size,
@@ -2112,6 +2121,7 @@ function Hero({ models, copy }: { models: M[]; copy: UiCopy }) {
           <br />
           {copy.heroBody2}
         </p>
+        <div className="heroActions"><button onClick={() => onStart("recommend")}>{copy.heroPrimary}</button><a href="/start">{copy.heroSecondary} ↗</a></div>
       </div>
       <div className="heroCard">
         <div className="chartTitle">

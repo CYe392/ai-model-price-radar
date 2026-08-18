@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.0.0 — Complete product launch
+
+- Added a guided four-step onboarding journey and homepage calls to action that deep-link into recommendations, workspace governance, prices, and the cost calculator.
+- Added launch-ready Plans, Methodology, About, Privacy, and Terms pages with explicit boundaries for private-preview access, local data, public-source collection, and features not yet offered.
+- Added canonical/Open Graph metadata, a web app manifest, sitemap, and explicit no-index robots policy appropriate for the current private deployment.
+- Added a 15-route release smoke suite covering product, policies, readiness, public API, embed, metadata, and recovery surfaces.
+- Added GitHub Actions quality gates, weekly dependency updates, a safe bug-report template, contributing rules, and a complete launch/deployment checklist.
+- Preserved the core product contract: no provider accounts, no automatic refresh, no invented payment/authentication service, and every release remains independently deployable and rollback-ready.
+
 ## v1.9.0 — Security and operational readiness
 
 - Added route-aware CSP, HSTS, content-type, referrer, permissions, framing, and cross-origin resource policies while preserving the public `/embed` contract.

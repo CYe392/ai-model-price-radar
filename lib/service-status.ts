@@ -1,15 +1,17 @@
-import { desc } from "drizzle-orm";
-import { getDb } from "../db";
-import { collectionRuns, sourceChecks } from "../db/schema";
 import { PUBLIC_CATALOG } from "./public-catalog";
 
-export const PRODUCT_VERSION = "1.9.0";
+export const PRODUCT_VERSION = "2.0.0";
 
 export async function getServiceStatus() {
   let database: "operational" | "unavailable" = "operational";
-  let lastCollection: typeof collectionRuns.$inferSelect | null = null;
-  let latestSources: (typeof sourceChecks.$inferSelect)[] = [];
+  let lastCollection: { collectedAt: string; updateCount: number; rejectedCount: number } | null = null;
+  let latestSources: { sourceId: string; sourceName: string; status: string; checkedAt: string }[] = [];
   try {
+    const [{ desc }, { getDb }, { collectionRuns, sourceChecks }] = await Promise.all([
+      import("drizzle-orm"),
+      import("../db"),
+      import("../db/schema"),
+    ]);
     const db = getDb();
     const [runs, checks] = await Promise.all([
       db.select().from(collectionRuns).orderBy(desc(collectionRuns.collectedAt)).limit(1),

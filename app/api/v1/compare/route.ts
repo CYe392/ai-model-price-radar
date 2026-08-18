@@ -1,17 +1,24 @@
-import { filterCatalog } from "../../../../lib/public-catalog";
-import { apiError, apiJson, envelope, optionsResponse } from "../../../../lib/public-api";
+import { filterCatalog, validateCatalogFilters } from "../../../../lib/public-catalog";
+import { apiError, apiJson, boundedNumber, envelope, optionsResponse, validateQuery } from "../../../../lib/public-api";
 
 export const dynamic = "force-dynamic";
 export function OPTIONS() { return optionsResponse(); }
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
+  const queryError = validateQuery(params, ["model", "provider", "region", "compliance", "sort", "input_share", "cache_hit", "limit"]);
+  if (queryError) return apiError(400, "invalid_query", queryError);
+  const filterError = validateCatalogFilters(params);
+  if (filterError) return apiError(400, "invalid_filter", filterError);
   const metric = params.get("sort") ?? "blended";
   if (!['input', 'cached', 'output', 'blended'].includes(metric))
     return apiError(400, "invalid_sort", "sort must be input, cached, output, or blended");
-  const inputShare = Math.min(1, Math.max(0, Number(params.get("input_share") ?? .8)));
-  const cacheHit = Math.min(1, Math.max(0, Number(params.get("cache_hit") ?? .4)));
-  const limit = Math.min(50, Math.max(1, Number(params.get("limit") ?? 20)));
+  const inputShare = boundedNumber(params, "input_share", .8, 0, 1);
+  const cacheHit = boundedNumber(params, "cache_hit", .4, 0, 1);
+  const limit = boundedNumber(params, "limit", 20, 1, 50, true);
+  if (inputShare === null) return apiError(400, "invalid_input_share", "input_share must be a number from 0 to 1");
+  if (cacheHit === null) return apiError(400, "invalid_cache_hit", "cache_hit must be a number from 0 to 1");
+  if (limit === null) return apiError(400, "invalid_limit", "limit must be an integer from 1 to 50");
   const routes = filterCatalog(params)
     .map((item) => {
       const input = item.prices.input * inputShare * (1 - cacheHit);

@@ -8,6 +8,7 @@ export default function ApiDocsPage() {
     ["GET /api/v1/compare", "Rank routes by standard input, cached input, output, or a blended workload price."],
     ["GET /api/v1/recommend", "Return explainable scenario recommendations with workload cost and score breakdown."],
     ["GET /api/v1/health", "Inspect the latest manual collection run and source health."],
+    ["GET /api/v1/status", "Inspect production readiness, storage connectivity, catalog availability, and manual-refresh state."],
   ];
   return (
     <main className="apiDocsPage">
@@ -18,8 +19,8 @@ export default function ApiDocsPage() {
       <section className="apiDocsHero">
         <b>PUBLIC READ API · V1</b>
         <h1>Put price intelligence<br />inside your workflow.</h1>
-        <p>Stable JSON endpoints, CORS, structured errors, five-minute cache headers, and no provider credentials. Reads never trigger a price refresh.</p>
-        <div><span>No API key</span><span>Read-only</span><span>Manual collection</span><span>USD / 1M tokens</span></div>
+        <p>Stable JSON endpoints, CORS, structured errors, request IDs, five-minute cache headers, and no provider credentials. Reads never trigger a price refresh.</p>
+        <div><span>No API key</span><span>Read-only</span><span>Manual collection</span><span>Request tracing</span><span>USD / 1M tokens</span></div>
       </section>
       <section className="apiDocsContent">
         <div>

@@ -1,5 +1,5 @@
-import { filterCatalog } from "../../../../lib/public-catalog";
-import { apiError, apiJson, envelope, optionsResponse } from "../../../../lib/public-api";
+import { filterCatalog, validateCatalogFilters } from "../../../../lib/public-catalog";
+import { apiError, apiJson, boundedNumber, envelope, optionsResponse, validateQuery } from "../../../../lib/public-api";
 
 export const dynamic = "force-dynamic";
 export function OPTIONS() { return optionsResponse(); }
@@ -15,13 +15,18 @@ const scenarios = {
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
+  const queryError = validateQuery(params, ["scenario", "priority", "model", "provider", "region", "compliance", "limit"]);
+  if (queryError) return apiError(400, "invalid_query", queryError);
+  const filterError = validateCatalogFilters(params);
+  if (filterError) return apiError(400, "invalid_filter", filterError);
   const scenarioId = params.get("scenario") ?? "daily-chat";
   const scenario = scenarios[scenarioId as keyof typeof scenarios];
   if (!scenario) return apiError(400, "invalid_scenario", `scenario must be one of: ${Object.keys(scenarios).join(", ")}`);
   const priority = params.get("priority") ?? "balanced";
   if (!['price', 'balanced', 'ability'].includes(priority))
     return apiError(400, "invalid_priority", "priority must be price, balanced, or ability");
-  const limit = Math.min(10, Math.max(1, Number(params.get("limit") ?? 3)));
+  const limit = boundedNumber(params, "limit", 3, 1, 10, true);
+  if (limit === null) return apiError(400, "invalid_limit", "limit must be an integer from 1 to 10");
   const results = filterCatalog(params)
     .filter((item) => item.ability_score >= scenario.minAbility && item.context_tokens >= scenario.minContext)
     .map((item) => {

@@ -1,0 +1,9 @@
+import { ProductShell } from "../product-shell";
+
+export default function PrivacyPage() {
+  return (
+    <ProductShell eyebrow="PRIVACY" title="Collect less. Explain what remains." lede="This notice describes the v2.0 private-preview product as deployed on August 17, 2026.">
+      <div className="policyCopy"><h2>Browser-local product data</h2><p>Price alert rules and events, interface preferences, workspace settings, responsibility-role labels, audit entries, and saved recommendation decisions are stored in your browser. They are not synchronized to a ModelScope user account because this release has no product account or cloud workspace service. Exporting workspace JSON is an explicit user action.</p><h2>Server-side operational data</h2><p>The service stores accepted price snapshots, collection runs, and source-parser health in Cloudflare D1. Edge request logs contain a generated request ID, method, path, response status, and duration. The application deliberately does not add query values, browser-local workspace contents, or provider credentials to its structured request log.</p><h2>Manual source collection</h2><p>Provider pages are fetched only after an authorized user presses Refresh prices. Reading the UI or public API does not trigger collection. Public page requests identify this pricing monitor and do not bypass provider access controls.</p><h2>Third parties and links</h2><p>The deployment infrastructure may process network metadata needed to serve the private site. Official source and GitHub links take you to third-party services governed by their own policies.</p><h2>Your choices</h2><p>Use Reset display defaults for interface preferences. Remove alert rules, triggered events, roles, and decisions in their product views. Clear site storage in your browser to remove all remaining browser-local product data. Contact the repository owner privately for a security concern.</p></div>
+    </ProductShell>
+  );
+}

@@ -10,6 +10,7 @@
 ## Release gate
 
 - Build and all automated tests pass.
+- All saved D1 migrations apply cleanly in order to an empty database.
 - ESLint and accessibility rules pass.
 - Production dependency audit is reviewed.
 - Release smoke covers root, onboarding, product policies, status, API, embed, metadata routes, and 404.

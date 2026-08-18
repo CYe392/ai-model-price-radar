@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -12,6 +12,7 @@
     "test": "npm run build && node --test tests/*.test.mjs",
     "smoke": "npm run build && node scripts/smoke.mjs",
     "lint": "eslint app db tests --ignore-pattern dist --ignore-pattern .next --ignore-pattern .wrangler",
+    "db:check": "node scripts/check-migrations.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

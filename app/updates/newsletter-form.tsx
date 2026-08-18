@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { trackAnalyticsEvent } from "../analytics-tracker";
 
 const notices: Record<string, string> = {
   confirmed: "Your email is confirmed. Future updates will arrive by email.",
@@ -39,6 +40,7 @@ export function NewsletterForm({ subscriptionStatus }: { subscriptionStatus?: st
 
     setState("done");
     setMessage("Check your inbox to confirm your subscription.");
+    trackAnalyticsEvent("newsletter_subscribe");
     formElement.reset();
   }
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.4.0 — Privacy-first growth operations
+
+- Added consent-gated, first-party analytics that stores only daily counts by event, canonical path, and coarse source category.
+- Added an authenticated 30-day aggregate report without IPs, emails, session IDs, device fingerprints, full referrers, queries, or per-user profiles.
+- Added a public growth-target manifest generated from the same model, provider, and update collections as the site.
+- Added administrator-authorized IndexNow submission with allowlisted public paths, bounded batches, and runtime key verification.
+- Added a read-only OpenSEO pilot workflow that evaluates public targets without automatic content generation, publishing, or source-price refresh.
+- Published the measurement methodology, operator runbook, privacy disclosure, and tests for consent, aggregation, authorization, and manual distribution.
+
 ## v2.3.0 — Public SEO and generative discovery
 
 - Replaced the private-preview no-index policy with public canonical metadata, search crawler access, full sitemap coverage, RSS, and large social previews.

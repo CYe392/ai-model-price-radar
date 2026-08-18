@@ -17,6 +17,7 @@ AI API price intelligence dashboard that compares official pricing, cache econom
 - Production readiness status, request tracing, security headers, strict public-API validation, error recovery, and an incident/rollback runbook
 - Public model/provider directories, permanent briefs, RSS and machine-readable discovery, structured data, and explicit product-scope boundaries
 - Double-opt-in regional email updates plus privacy-first consent and advertising-readiness controls
+- Consent-gated daily aggregate analytics, a public growth-target manifest, and administrator-only IndexNow distribution
 
 No provider accounts or paid inference APIs are required for collection. Provider billing pages remain authoritative.
 
@@ -58,6 +59,8 @@ GET /api/v1/openapi.json
 Interactive documentation is available at `/api-docs`, and the compact `/embed` page can be placed in an iframe. Public access is fair-use; consumers should cache responses and treat linked provider billing pages as authoritative.
 
 Human-readable production readiness is available at `/status`. Operational response and rollback procedures are documented in [docs/OPERATIONS.md](docs/OPERATIONS.md), and vulnerability reporting guidance is in [SECURITY.md](SECURITY.md).
+
+Growth measurement and distribution operations are documented in [docs/GROWTH_OPERATIONS.md](docs/GROWTH_OPERATIONS.md). The OpenSEO evaluation boundary is documented in [docs/OPENSEO_PILOT.md](docs/OPENSEO_PILOT.md).
 
 Start with `/start`, review pricing questions at `/guide`, browse `/models` and `/providers`, and inspect calculation and recommendation assumptions at `/methodology`. Public pages are indexable; search and user-request crawlers are allowed while GPTBot training crawl is separately disallowed.
 

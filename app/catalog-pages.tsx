@@ -37,7 +37,7 @@ export function CatalogDetail({ group, type }: { group: CatalogGroup; type: "mod
             <strong>{money(route.prices.cache_write)}</strong>
             <strong>{money(route.prices.output)}</strong>
             <span className="catalogRegions">{route.regions.join(", ")}</span>
-            <small className="catalogEvidence"><a href={route.source_url} rel="noreferrer">Official source ↗</a> · {route.verification} catalog · {route.context_tokens.toLocaleString()} context tokens</small>
+            <small className="catalogEvidence"><a href={route.source_url} rel="noreferrer" data-analytics-event="provider_outbound">Official source ↗</a> · {route.verification} catalog · {route.context_tokens.toLocaleString()} context tokens</small>
           </article>
         ))}
       </div>

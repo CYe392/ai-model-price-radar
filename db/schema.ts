@@ -127,3 +127,25 @@ export const newsletterDeliveries = sqliteTable(
     index("idx_newsletter_deliveries_subscriber").on(table.subscriberId),
   ],
 );
+
+export const analyticsDaily = sqliteTable(
+  "analytics_daily",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    day: text("day").notNull(),
+    event: text("event").notNull(),
+    path: text("path").notNull(),
+    source: text("source").notNull().default("direct"),
+    count: integer("count").notNull().default(1),
+    lastSeenAt: text("last_seen_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_analytics_daily_dimensions").on(
+      table.day,
+      table.event,
+      table.path,
+      table.source,
+    ),
+    index("idx_analytics_daily_day_event").on(table.day, table.event),
+  ],
+);

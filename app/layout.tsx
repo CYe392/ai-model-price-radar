@@ -8,6 +8,7 @@ import "./guide.css";
 import { ConsentManager } from "./consent-manager";
 import { JsonLd } from "./json-ld";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "../lib/site";
+import { AnalyticsTracker } from "./analytics-tracker";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: "ModelScope | AI API Price Intelligence", template: "%s | ModelScope" },
@@ -20,4 +21,4 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: { icon: "/favicon.svg" },
 };
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body><JsonLd data={[{ "@context": "https://schema.org", "@type": "Organization", name: SITE_NAME, url: SITE_URL }, { "@context": "https://schema.org", "@type": "WebSite", name: SITE_NAME, url: SITE_URL, description: SITE_DESCRIPTION }]} />{children}<ConsentManager /></body></html>}
+export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body><JsonLd data={[{ "@context": "https://schema.org", "@type": "Organization", name: SITE_NAME, url: SITE_URL }, { "@context": "https://schema.org", "@type": "WebSite", name: SITE_NAME, url: SITE_URL, description: SITE_DESCRIPTION }]} />{children}<AnalyticsTracker /><ConsentManager /></body></html>}

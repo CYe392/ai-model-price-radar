@@ -9,8 +9,8 @@ export async function GET(request: Request) {
     openapi: "3.1.0",
     info: {
       title: "ModelScope Price Radar Public API",
-      version: "1.1.0",
-      description: "Read-only AI model pricing, comparison, recommendation, and collection-health endpoints. Public prices are planning data; provider billing pages remain authoritative.",
+      version: "1.2.0",
+      description: "Read-only AI model pricing, comparison, recommendation, collection-health, and public discovery-target endpoints. Public prices are planning data; provider billing pages remain authoritative.",
     },
     servers: [{ url: `${base}/api/v1` }],
     paths: {
@@ -19,6 +19,7 @@ export async function GET(request: Request) {
       "/recommend": { get: { summary: "Recommend routes for a scenario", parameters: ["scenario", "priority", "region", "compliance", "limit"].map((name) => ({ name, in: "query", schema: { type: "string" } })), responses: { "200": { description: "Recommendations with score breakdown" }, "400": { description: "Invalid scenario or priority" } } } },
       "/health": { get: { summary: "Read collection health", responses: { "200": { description: "Latest collection and source status" } } } },
       "/status": { get: { summary: "Read production readiness", responses: { "200": { description: "Application, catalog, database, and manual-collection readiness" } } } },
+      "/growth/targets": { get: { summary: "Read public discovery targets", responses: { "200": { description: "Canonical model, provider, core, and update target manifest" } } } },
     },
     components: {
       schemas: {

@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.3.0 — Public SEO and generative discovery
+
+- Replaced the private-preview no-index policy with public canonical metadata, search crawler access, full sitemap coverage, RSS, and large social previews.
+- Added stable model and provider profile URLs with route-level input, cache-hit, cache-write, output, region, source, and verification context.
+- Added an answer-first AI API pricing guide and JSON-LD for the organization, website, datasets, provider collections, articles, and FAQ content.
+- Added `llms.txt` as a supplementary machine-readable map while keeping standard HTML, internal links, robots, and sitemaps authoritative.
+- Allowed Googlebot, Bingbot, OAI-SearchBot, and ChatGPT-User while separately disallowing GPTBot training crawl.
+- Added a branded Open Graph illustration and updated public access, terms, README, and launch gates for an indexable product.
+
 ## v2.2.0 — Advertising readiness and consent
 
 - Added a site-wide consent manager with necessary, first-party analytics, and advertising choices; optional categories default to off and can be changed later.

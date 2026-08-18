@@ -3,16 +3,21 @@ import "./globals.css";
 import "./newsletter.css";
 import "./commercial.css";
 import "./commercial-options.css";
+import "./discovery.css";
+import "./guide.css";
 import { ConsentManager } from "./consent-manager";
+import { JsonLd } from "./json-ld";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "../lib/site";
 export const metadata: Metadata = {
-  metadataBase: new URL("https://modelscope-price-radar.cybercl19.chatgpt.site"),
+  metadataBase: new URL(SITE_URL),
   title: { default: "ModelScope | AI API Price Intelligence", template: "%s | ModelScope" },
-  description: "Compare AI API pricing, cache economics, regional availability, total workload cost, and provider routes from public official sources.",
+  description: SITE_DESCRIPTION,
   applicationName: "ModelScope AI API Price Radar",
   alternates: { canonical: "/" },
-  openGraph: { type: "website", siteName: "ModelScope", title: "ModelScope | AI API Price Intelligence", description: "Route-level AI API price intelligence, workload costs, regions, source health, and explainable recommendations.", url: "/" },
-  robots: { index: false, follow: false, noarchive: true, nocache: true },
+  openGraph: { type: "website", siteName: "ModelScope", title: "ModelScope | AI API Price Intelligence", description: "Route-level AI API price intelligence, workload costs, regions, source health, and explainable recommendations.", url: "/", images: [{ url: "/modelscope-og.png", width: 1740, height: 917, alt: "ModelScope AI API price routes and comparison radar" }] },
+  twitter: { card: "summary_large_image", title: "ModelScope | AI API Price Intelligence", description: SITE_DESCRIPTION, images: ["/modelscope-og.png"] },
+  robots: { index: true, follow: true, noarchive: false, nocache: false, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
   manifest: "/manifest.webmanifest",
   icons: { icon: "/favicon.svg" },
 };
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body>{children}<ConsentManager /></body></html>}
+export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body><JsonLd data={[{ "@context": "https://schema.org", "@type": "Organization", name: SITE_NAME, url: SITE_URL }, { "@context": "https://schema.org", "@type": "WebSite", name: SITE_NAME, url: SITE_URL, description: SITE_DESCRIPTION }]} />{children}<ConsentManager /></body></html>}

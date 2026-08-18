@@ -15,7 +15,8 @@ AI API price intelligence dashboard that compares official pricing, cache econom
 - Browser-local team workspace with governance presets, budget guardrails, decision records, audit history, and portable JSON handoff
 - Browser-local personalization with English/Chinese core UI, adaptive themes, density controls, reduced motion, high contrast, keyboard focus, and print support
 - Production readiness status, request tracing, security headers, strict public-API validation, error recovery, and an incident/rollback runbook
-- Guided onboarding plus Plans, Methodology, About, Privacy, and Terms pages with explicit private-preview and product-scope boundaries
+- Public model/provider directories, permanent briefs, RSS and machine-readable discovery, structured data, and explicit product-scope boundaries
+- Double-opt-in regional email updates plus privacy-first consent and advertising-readiness controls
 
 No provider accounts or paid inference APIs are required for collection. Provider billing pages remain authoritative.
 
@@ -58,7 +59,7 @@ Interactive documentation is available at `/api-docs`, and the compact `/embed` 
 
 Human-readable production readiness is available at `/status`. Operational response and rollback procedures are documented in [docs/OPERATIONS.md](docs/OPERATIONS.md), and vulnerability reporting guidance is in [SECURITY.md](SECURITY.md).
 
-Start with `/start`, review calculation and recommendation assumptions at `/methodology`, and inspect current access scope at `/plans`. The deployed site is private and intentionally emits a no-index policy.
+Start with `/start`, review pricing questions at `/guide`, browse `/models` and `/providers`, and inspect calculation and recommendation assumptions at `/methodology`. Public pages are indexable; search and user-request crawlers are allowed while GPTBot training crawl is separately disallowed.
 
 ## Releases
 

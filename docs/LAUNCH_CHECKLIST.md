@@ -4,7 +4,7 @@
 
 - Core price, cache, region, history, health, brief, alerts, recommendation, workspace, and preference workflows are complete.
 - Manual refresh remains the only collection trigger.
-- Plans page distinguishes current private-preview access from capabilities that do not yet exist.
+- Plans page distinguishes free public access from capabilities that do not yet exist.
 - Methodology, privacy, terms, security, and operations pages match the implemented system.
 
 ## Release gate
@@ -20,7 +20,8 @@
 
 - The exact merge commit is pushed to the existing Sites source repository.
 - The artifact is built from that source and saved as a new Sites version.
-- The saved version is deployed to the existing private production URL.
-- Production root, API finder, calculator, onboarding, plans, methodology, privacy, terms, status, API docs, embed, and 404 are browser-checked.
+- The saved version is deployed to the approved public production URL.
+- Production root, model/provider directories, guide, updates, API finder, calculator, onboarding, plans, methodology, privacy, terms, status, API docs, embed, metadata, and 404 are browser-checked.
+- `robots.txt`, canonical URLs, sitemap, RSS, `llms.txt`, Open Graph image, and structured data are verified on the public origin.
 - Manual refresh is not invoked during smoke unless source collection itself is the test target.
 - Previous saved Sites version remains available for rollback.

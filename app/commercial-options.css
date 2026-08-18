@@ -1,0 +1,1 @@
+.consentDialog>.consentOption{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;border-top:1px solid #e0e5df;padding:15px 0}.consentDialog .consentOption span{display:flex;flex-direction:column}

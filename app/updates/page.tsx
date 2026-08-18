@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ProductShell } from "../product-shell";
 import { PRODUCT_UPDATES } from "../../lib/updates";
 import { NewsletterForm } from "./newsletter-form";
+import { AdSlot } from "../ad-slot";
 
 export const metadata: Metadata = {
   title: "Updates",
@@ -15,6 +16,7 @@ export default async function UpdatesPage({ searchParams }: { searchParams: Prom
   return (
     <ProductShell eyebrow="UPDATES" title="Changes worth understanding." lede="Permanent briefs explain what changed, what it affects, and how ModelScope handles the underlying evidence.">
       <NewsletterForm subscriptionStatus={subscription} />
+      <AdSlot placement="updates-leaderboard" />
       <div className="updateList">
         {PRODUCT_UPDATES.map((update) => (
           <article key={update.slug}>

@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.0 — Advertising readiness and consent
+
+- Added a site-wide consent manager with necessary, first-party analytics, and advertising choices; optional categories default to off and can be changed later.
+- Added stable, visibly labeled advertising placements that currently render only a first-party house message without third-party tracking.
+- Published an advertising policy that separates sponsorship from ranking, price evidence, source health, editorial coverage, and corrections.
+- Documented the activation gate for any future advertising network, including regional consent review and Google-certified CMP requirements where applicable.
+- Expanded privacy disclosures for the consent record and confirmed that comparison, recommendations, and email updates remain available after rejecting optional uses.
+
 ## v2.1.0 — Email updates and publishing foundation
 
 - Added region-aware, double-opt-in email subscriptions backed by Cloudflare D1, with durable consent, confirmation, unsubscribe, and delivery state.

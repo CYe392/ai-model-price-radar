@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./newsletter.css";
+import "./commercial.css";
+import "./commercial-options.css";
+import { ConsentManager } from "./consent-manager";
 export const metadata: Metadata = {
   metadataBase: new URL("https://modelscope-price-radar.cybercl19.chatgpt.site"),
   title: { default: "ModelScope | AI API Price Intelligence", template: "%s | ModelScope" },
@@ -12,4 +15,4 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: { icon: "/favicon.svg" },
 };
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body>{children}</body></html>}
+export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body>{children}<ConsentManager /></body></html>}

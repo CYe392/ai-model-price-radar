@@ -11,7 +11,7 @@ export function ProductShell({ eyebrow, title, lede, children }: { eyebrow: stri
       </header>
       <section className="productHero"><b>{eyebrow}</b><h1>{title}</h1><p>{lede}</p></section>
       <section className="productBody">{children}</section>
-      <footer><span>ModelScope · AI API price intelligence</span><nav><Link href="/updates">Email updates</Link><Link href="/about">About</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><a href="https://github.com/CYe392/ai-model-price-radar">GitHub ↗</a></nav></footer>
+      <footer><span>ModelScope · AI API price intelligence</span><nav><Link href="/updates">Email updates</Link><Link href="/advertising">Advertising</Link><Link href="/about">About</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><a href="https://github.com/CYe392/ai-model-price-radar">GitHub ↗</a></nav></footer>
     </main>
   );
 }

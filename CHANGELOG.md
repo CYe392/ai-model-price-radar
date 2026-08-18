@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.0 — Private workspace and governance
+
+- Added a browser-local workspace for team responsibility roles, recommendation decisions, and an auditable action history.
+- Added balanced, US enterprise, EU regulated, cost sandbox, and Mainland China governance presets that synchronize region, compliance, currency, risk, and budget settings.
+- Added advisory and hard monthly API budget guardrails; hard caps exclude over-budget routes before recommendation ranking.
+- Added one-click capture of the leading recommendation as a portable decision record.
+- Added validated JSON export and import so workspace data can be handed off without an external identity or storage service.
+- Made the local-only privacy boundary explicit: roles document responsibility but do not create accounts, permissions, invitations, or cloud sync.
+
 ## v1.6.0 — Public API and integrations
 
 - Added versioned CORS-enabled read APIs for catalog, comparison, recommendations, and collection health.

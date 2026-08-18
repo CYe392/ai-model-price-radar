@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, no-irregular-whitespace, jsx-a11y/anchor-is-valid */
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 type Region =
   | "全球"
   | "美国"
@@ -158,6 +159,40 @@ type AlertEvent = {
   ruleId: string;
   change: PriceChange;
   triggeredAt: string;
+};
+type TeamMember = { id: string; name: string; role: "Owner" | "Editor" | "Viewer" };
+type DecisionRecord = {
+  id: string;
+  savedAt: string;
+  scenario: string;
+  model: string;
+  provider: string;
+  region: string;
+  compliance: string;
+  score: number;
+  monthlyUsd: number;
+  confidence: string;
+};
+type AuditEntry = { id: string; at: string; action: string };
+type WorkspaceState = {
+  name: string;
+  organization: string;
+  monthlyBudget: number;
+  enforceBudget: boolean;
+  preset: string;
+  members: TeamMember[];
+  decisions: DecisionRecord[];
+  audit: AuditEntry[];
+};
+const DEFAULT_WORKSPACE: WorkspaceState = {
+  name: "My AI API workspace",
+  organization: "Private local workspace",
+  monthlyBudget: 1000,
+  enforceBudget: false,
+  preset: "balanced",
+  members: [{ id: "local-owner", name: "Workspace owner", role: "Owner" }],
+  decisions: [],
+  audit: [],
 };
 type HistorySnapshot = {
   id: number;
@@ -936,6 +971,8 @@ export default function Home() {
     [alertsLoaded, setAlertsLoaded] = useState(false),
     [briefCategory, setBriefCategory] = useState("all"),
     [briefSeverity, setBriefSeverity] = useState("all");
+  const [workspace, setWorkspace] = useState<WorkspaceState>(DEFAULT_WORKSPACE),
+    [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   useEffect(() => {
     try {
       setAlerts(JSON.parse(localStorage.getItem("modelscope-alert-rules") || "[]"));
@@ -952,6 +989,20 @@ export default function Home() {
     localStorage.setItem("modelscope-alert-rules", JSON.stringify(alerts));
     localStorage.setItem("modelscope-alert-events", JSON.stringify(alertEvents));
   }, [alerts, alertEvents, alertsLoaded]);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("modelscope-team-workspace");
+      if (saved) setWorkspace({ ...DEFAULT_WORKSPACE, ...JSON.parse(saved) });
+    } catch {
+      setWorkspace(DEFAULT_WORKSPACE);
+    } finally {
+      setWorkspaceLoaded(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (workspaceLoaded)
+      localStorage.setItem("modelscope-team-workspace", JSON.stringify(workspace));
+  }, [workspace, workspaceLoaded]);
   useEffect(() => {
     if (!["history", "health"].includes(tab) || historyLoaded) return;
     setHistoryBusy(true);
@@ -1235,19 +1286,55 @@ export default function Home() {
           };
         }),
     )
+    .filter(
+      (candidate) =>
+        !workspace.enforceBudget || candidate.monthlyUsd <= workspace.monthlyBudget,
+    )
     .sort((a, b) => b.score - a.score);
-  const recommendationExclusions = liveModels.reduce(
-    (count, m) =>
-      count +
-      m.providers.filter(
-        (p) =>
-          !available(p) ||
-          m.ability < selectedScenario.minAbility ||
-          contextSize(m.context) < selectedScenario.minContext ||
-          (riskProfile === "enterprise" && !routePolicy(p).noTraining),
-      ).length,
-    0,
-  );
+  const recommendationExclusions = Math.max(0, allRouteCount - rankedRecommendations.length);
+  function applyGovernancePreset(preset: string) {
+    const settings = {
+      balanced: { region: "全球" as Region, compliance: "all" as ComplianceFilter, currency: "USD" as Currency, risk: "balanced", budget: 1000, enforce: false },
+      "us-enterprise": { region: "美国" as Region, compliance: "no_training" as ComplianceFilter, currency: "USD" as Currency, risk: "enterprise", budget: 5000, enforce: true },
+      "eu-regulated": { region: "欧盟" as Region, compliance: "gdpr" as ComplianceFilter, currency: "EUR" as Currency, risk: "enterprise", budget: 5000, enforce: true },
+      "cost-sandbox": { region: "全球" as Region, compliance: "all" as ComplianceFilter, currency: "USD" as Currency, risk: "experimental", budget: 250, enforce: true },
+      "china-mainland": { region: "中国大陆" as Region, compliance: "all" as ComplianceFilter, currency: "CNY" as Currency, risk: "balanced", budget: 3000, enforce: true },
+    }[preset];
+    if (!settings) return;
+    setRegion(settings.region);
+    setCompliance(settings.compliance);
+    setCurrency(settings.currency);
+    setRiskProfile(settings.risk);
+    setWorkspace((current) => ({
+      ...current,
+      preset,
+      monthlyBudget: settings.budget,
+      enforceBudget: settings.enforce,
+      audit: [{ id: `audit-${Date.now()}`, at: new Date().toISOString(), action: `Applied ${preset} governance preset` }, ...current.audit].slice(0, 100),
+    }));
+  }
+  function saveTopRecommendation() {
+    const candidate = rankedRecommendations[0];
+    if (!candidate) return;
+    const record: DecisionRecord = {
+      id: globalThis.crypto.randomUUID(),
+      savedAt: new Date().toISOString(),
+      scenario: selectedScenario.title,
+      model: candidate.m.name,
+      provider: providerLabel(candidate.p.name),
+      region: regionLabel(region),
+      compliance: complianceLabel(compliance),
+      score: candidate.score,
+      monthlyUsd: candidate.monthlyUsd,
+      confidence: candidate.confidence,
+    };
+    setWorkspace((current) => ({
+      ...current,
+      decisions: [record, ...current.decisions],
+      audit: [{ id: `audit-${Date.now()}`, at: record.savedAt, action: `Saved ${record.model} via ${record.provider} for ${record.scenario}` }, ...current.audit].slice(0, 100),
+    }));
+    setTab("workspace");
+  }
   return (
     <main>
       <Header tab={tab} setTab={setTab} />
@@ -1262,6 +1349,7 @@ export default function Home() {
               ["health", "●", "Data health"],
               ["brief", "≡", "Market brief"],
               ["alerts", "!", "Price alerts"],
+              ["workspace", "▦", "Workspace"],
               ["recommend", "◇", "Recommendations"],
             ].map((x) => (
               <button
@@ -1273,6 +1361,7 @@ export default function Home() {
                 {x[2]}
                 {x[0] === "brief" && <i>3</i>}
                 {x[0] === "alerts" && alertEvents.length > 0 && <i>{alertEvents.length}</i>}
+                {x[0] === "workspace" && workspace.decisions.length > 0 && <i>{workspace.decisions.length}</i>}
               </button>
             ))}
           </div>
@@ -1654,7 +1743,7 @@ export default function Home() {
                 <strong>{selectedScenario.minAbility} ability</strong>
                 <span>{formatTokens(selectedScenario.minContext)} context</span>
               </div>
-              <p>{selectedScenario.desc}. Estimates use public token prices and the scenario workload; run an eval before production.</p>
+              <p>{selectedScenario.desc}. Workspace guardrail: {workspace.enforceBudget ? `hard cap of ${formatMoney(workspace.monthlyBudget, currency, 2)} / month` : `${formatMoney(workspace.monthlyBudget, currency, 2)} advisory budget`}. Run an eval before production.</p>
             </div>
             {rankedRecommendations.length ? (
               <div className="recommendationEngine">
@@ -1686,7 +1775,10 @@ export default function Home() {
                     <span>{rankedRecommendations[0].policy.trainingLabel}</span>
                     <span>{rankedRecommendations[0].policy.retentionLabel}</span>
                   </div>
-                  <button onClick={() => setTab("calculator")}>Open full cost model →</button>
+                  <div className="recommendActions">
+                    <button onClick={() => setTab("calculator")}>Open full cost model →</button>
+                    <button onClick={saveTopRecommendation}>Save decision to workspace</button>
+                  </div>
                 </article>
                 <div className="alternativeRoutes">
                   <div>
@@ -1714,7 +1806,7 @@ export default function Home() {
                 </div>
               </div>
             ) : (
-              <div className="empty">No route clears every hard requirement. Relax the region, compliance, risk, ability, or context constraints.</div>
+              <div className="empty">No route clears every hard requirement. Relax the region, compliance, risk, workspace budget, ability, or context constraints.</div>
             )}
             <div className="method">
               <b>Transparent scoring</b>
@@ -1733,6 +1825,13 @@ export default function Home() {
             onClearEvents={() => setAlertEvents([])}
             onRefresh={refresh}
             busy={busy}
+          />
+        )}
+        {tab === "workspace" && (
+          <WorkspaceCenter
+            workspace={workspace}
+            setWorkspace={setWorkspace}
+            onApplyPreset={applyGovernancePreset}
           />
         )}
         {tab === "calculator" && (
@@ -1833,6 +1932,7 @@ function Header({ tab, setTab }: { tab: string; setTab: (v: string) => void }) {
           ["health", "Data health"],
           ["brief", "Market brief"],
           ["alerts", "Alerts"],
+          ["workspace", "Workspace"],
           ["recommend", "API finder"],
         ].map((x) => (
           <button
@@ -2084,6 +2184,151 @@ function verificationLabel(status: VerificationStatus) {
     reference: "REFERENCE",
     quarantined: "QUARANTINED",
   }[status];
+}
+function WorkspaceCenter({
+  workspace,
+  setWorkspace,
+  onApplyPreset,
+}: {
+  workspace: WorkspaceState;
+  setWorkspace: Dispatch<SetStateAction<WorkspaceState>>;
+  onApplyPreset: (preset: string) => void;
+}) {
+  const [name, setName] = useState(workspace.name),
+    [organization, setOrganization] = useState(workspace.organization),
+    [budget, setBudget] = useState(workspace.monthlyBudget),
+    [enforce, setEnforce] = useState(workspace.enforceBudget),
+    [memberName, setMemberName] = useState(""),
+    [memberRole, setMemberRole] = useState<TeamMember["role"]>("Viewer"),
+    [importError, setImportError] = useState("");
+  const audit = (action: string): AuditEntry => ({
+    id: globalThis.crypto.randomUUID(),
+    at: new Date().toISOString(),
+    action,
+  });
+  function saveSettings() {
+    setWorkspace((current) => ({
+      ...current,
+      name: name.trim() || DEFAULT_WORKSPACE.name,
+      organization: organization.trim() || DEFAULT_WORKSPACE.organization,
+      monthlyBudget: Math.max(0, budget),
+      enforceBudget: enforce,
+      audit: [audit("Updated workspace settings and budget guardrail"), ...current.audit].slice(0, 100),
+    }));
+  }
+  function addMember() {
+    if (!memberName.trim()) return;
+    const member: TeamMember = {
+      id: globalThis.crypto.randomUUID(),
+      name: memberName.trim(),
+      role: memberRole,
+    };
+    setWorkspace((current) => ({
+      ...current,
+      members: [...current.members, member],
+      audit: [audit(`Added local ${member.role.toLowerCase()} role: ${member.name}`), ...current.audit].slice(0, 100),
+    }));
+    setMemberName("");
+  }
+  function removeMember(id: string) {
+    setWorkspace((current) => {
+      const member = current.members.find((item) => item.id === id);
+      return {
+        ...current,
+        members: current.members.filter((item) => item.id !== id),
+        audit: [audit(`Removed local role: ${member?.name ?? "member"}`), ...current.audit].slice(0, 100),
+      };
+    });
+  }
+  function removeDecision(id: string) {
+    setWorkspace((current) => ({
+      ...current,
+      decisions: current.decisions.filter((item) => item.id !== id),
+      audit: [audit("Removed a saved decision record"), ...current.audit].slice(0, 100),
+    }));
+  }
+  function exportWorkspace() {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([JSON.stringify(workspace, null, 2)], { type: "application/json" }));
+    link.download = "modelscope-workspace.json";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+  async function importWorkspace(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text()) as WorkspaceState;
+      if (!parsed.name || !Array.isArray(parsed.members) || !Array.isArray(parsed.decisions))
+        throw new Error("Invalid workspace structure");
+      setWorkspace({ ...DEFAULT_WORKSPACE, ...parsed, audit: [audit("Imported portable workspace file"), ...(parsed.audit ?? [])].slice(0, 100) });
+      setName(parsed.name);
+      setOrganization(parsed.organization);
+      setBudget(parsed.monthlyBudget);
+      setEnforce(parsed.enforceBudget);
+      setImportError("");
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Import failed");
+    } finally {
+      event.target.value = "";
+    }
+  }
+  const presets = [
+    ["balanced", "Balanced", "Advisory budget · global discovery"],
+    ["us-enterprise", "US enterprise", "No-training routes · hard USD cap"],
+    ["eu-regulated", "EU regulated", "GDPR routes · EUR · hard cap"],
+    ["cost-sandbox", "Cost sandbox", "$250 hard cap · experimental"],
+    ["china-mainland", "China mainland", "Mainland routes · CNY · local scope"],
+  ];
+  return (
+    <div className="workspaceCenter">
+      <Title
+        label="PRIVATE TEAM WORKSPACE"
+        title="Turn comparisons into governed decisions"
+        sub="This release stores workspace data only in this browser. Export a portable JSON file to hand it to another person; no member details are sent to an external identity provider."
+      />
+      <div className="workspacePrivacy"><b>LOCAL-ONLY PRIVACY</b><span>No sign-in, cloud sync, email invitation, or hidden telemetry. Roles document responsibility; they do not create remote accounts.</span></div>
+      <div className="workspaceLayout">
+        <section className="workspaceSettings">
+          <div className="workspaceTitle"><b>WORKSPACE SETTINGS</b><button onClick={saveSettings}>Save settings</button></div>
+          <label>Name<input value={name} onChange={(event) => setName(event.target.value)} /></label>
+          <label>Organization<input value={organization} onChange={(event) => setOrganization(event.target.value)} /></label>
+          <label>Monthly API budget (USD)<input type="number" min="0" value={budget} onChange={(event) => setBudget(+event.target.value)} /></label>
+          <label className="budgetToggle" htmlFor="workspace-budget-enforcement"><input id="workspace-budget-enforcement" aria-label="Enforce monthly budget as a hard recommendation cap" type="checkbox" checked={enforce} onChange={(event) => setEnforce(event.target.checked)} /><span><b>Enforce as hard recommendation cap</b><small>Routes above budget are excluded before ranking</small></span></label>
+          <div className="portableWorkspace">
+            <button onClick={exportWorkspace}>Export JSON</button>
+            <label>Import JSON<input type="file" accept="application/json" onChange={importWorkspace} /></label>
+            {importError && <small>{importError}</small>}
+          </div>
+        </section>
+        <section className="governancePresets">
+          <div className="workspaceTitle"><b>GOVERNANCE PRESETS</b><span>Applies filters immediately</span></div>
+          {presets.map(([id, title, desc]) => (
+            <button className={workspace.preset === id ? "selected" : ""} key={id} onClick={() => onApplyPreset(id)}>
+              <i>{workspace.preset === id ? "✓" : ""}</i><span><b>{title}</b><small>{desc}</small></span>
+            </button>
+          ))}
+        </section>
+      </div>
+      <div className="workspaceLayout lower">
+        <section className="teamRoles">
+          <div className="workspaceTitle"><b>RESPONSIBILITY ROLES</b><span>{workspace.members.length} local records</span></div>
+          <div className="memberBuilder"><input placeholder="Name or team label" value={memberName} onChange={(event) => setMemberName(event.target.value)} /><select value={memberRole} onChange={(event) => setMemberRole(event.target.value as TeamMember["role"])}><option>Owner</option><option>Editor</option><option>Viewer</option></select><button onClick={addMember}>Add</button></div>
+          {workspace.members.map((member) => <article key={member.id}><i>{member.name.slice(0, 1).toUpperCase()}</i><span><b>{member.name}</b><small>{member.role}</small></span>{member.id !== "local-owner" && <button onClick={() => removeMember(member.id)}>Remove</button>}</article>)}
+        </section>
+        <section className="decisionRecords">
+          <div className="workspaceTitle"><b>DECISION RECORDS</b><span>{workspace.decisions.length} saved</span></div>
+          {workspace.decisions.map((decision) => <article key={decision.id}><div><b>{decision.model}</b><span>{decision.provider} · {decision.scenario}</span></div><strong>${decision.monthlyUsd.toFixed(2)}/mo</strong><small>{decision.region} · {decision.compliance} · score {decision.score.toFixed(1)}</small><button onClick={() => removeDecision(decision.id)}>Remove</button></article>)}
+          {!workspace.decisions.length && <div className="workspaceEmpty">Save a recommendation to create a decision record.</div>}
+        </section>
+      </div>
+      <section className="auditLog">
+        <div className="workspaceTitle"><b>LOCAL AUDIT LOG</b><span>{workspace.audit.length} actions</span></div>
+        {workspace.audit.slice(0, 12).map((entry) => <article key={entry.id}><time>{new Date(entry.at).toLocaleString("en-US")}</time><span>{entry.action}</span></article>)}
+        {!workspace.audit.length && <div className="workspaceEmpty">Governance and decision actions will appear here.</div>}
+      </section>
+    </div>
+  );
 }
 function AlertCenter({
   models,

@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { SITE_URL } from "../../lib/site";
 
-const base = "https://modelscope-price-radar.cybercl19.chatgpt.site";
+const base = SITE_URL;
 
 export default function ApiDocsPage() {
   const endpoints = [
@@ -9,6 +10,7 @@ export default function ApiDocsPage() {
     ["GET /api/v1/recommend", "Return explainable scenario recommendations with workload cost and score breakdown."],
     ["GET /api/v1/health", "Inspect the latest manual collection run and source health."],
     ["GET /api/v1/status", "Inspect production readiness, storage connectivity, catalog availability, and manual-refresh state."],
+    ["GET /api/v1/growth/targets", "Read the canonical public model, provider, core-page, and update discovery manifest."],
   ];
   return (
     <main className="apiDocsPage">

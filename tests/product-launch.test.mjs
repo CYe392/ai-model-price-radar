@@ -39,11 +39,12 @@ test("publishes consistent product, privacy, and terms navigation", () => {
   assert.match(terms, /No purchase or provider relationship/);
 });
 
-test("adds metadata while keeping the private deployment out of search indexes", () => {
+test("adds public metadata and explicit crawler controls", () => {
   assert.match(layout, /metadataBase/);
   assert.match(layout, /openGraph/);
-  assert.match(layout, /index: false/);
-  assert.match(robots, /disallow: "\/"/);
+  assert.match(layout, /index: true/);
+  assert.match(robots, /OAI-SearchBot/);
+  assert.match(robots, /GPTBot/);
   assert.match(sitemap, /\/methodology/);
   assert.match(manifest, /display: "standalone"/);
 });

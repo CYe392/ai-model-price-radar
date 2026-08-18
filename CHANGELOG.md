@@ -1,5 +1,48 @@
 # Changelog
 
+## v2.4.0 — Privacy-first growth operations
+
+- Added consent-gated, first-party analytics that stores only daily counts by event, canonical path, and coarse source category.
+- Added an authenticated 30-day aggregate report without IPs, emails, session IDs, device fingerprints, full referrers, queries, or per-user profiles.
+- Added a public growth-target manifest generated from the same model, provider, and update collections as the site.
+- Added administrator-authorized IndexNow submission with allowlisted public paths, bounded batches, and runtime key verification.
+- Added a read-only OpenSEO pilot workflow that evaluates public targets without automatic content generation, publishing, or source-price refresh.
+- Published the measurement methodology, operator runbook, privacy disclosure, and tests for consent, aggregation, authorization, and manual distribution.
+
+## v2.3.0 — Public SEO and generative discovery
+
+- Replaced the private-preview no-index policy with public canonical metadata, search crawler access, full sitemap coverage, RSS, and large social previews.
+- Added stable model and provider profile URLs with route-level input, cache-hit, cache-write, output, region, source, and verification context.
+- Added an answer-first AI API pricing guide and JSON-LD for the organization, website, datasets, provider collections, articles, and FAQ content.
+- Added `llms.txt` as a supplementary machine-readable map while keeping standard HTML, internal links, robots, and sitemaps authoritative.
+- Allowed Googlebot, Bingbot, OAI-SearchBot, and ChatGPT-User while separately disallowing GPTBot training crawl.
+- Added a branded Open Graph illustration and updated public access, terms, README, and launch gates for an indexable product.
+
+## v2.2.0 — Advertising readiness and consent
+
+- Added a site-wide consent manager with necessary, first-party analytics, and advertising choices; optional categories default to off and can be changed later.
+- Added stable, visibly labeled advertising placements that currently render only a first-party house message without third-party tracking.
+- Published an advertising policy that separates sponsorship from ranking, price evidence, source health, editorial coverage, and corrections.
+- Documented the activation gate for any future advertising network, including regional consent review and Google-certified CMP requirements where applicable.
+- Expanded privacy disclosures for the consent record and confirmed that comparison, recommendations, and email updates remain available after rejecting optional uses.
+
+## v2.1.0 — Email updates and publishing foundation
+
+- Added region-aware, double-opt-in email subscriptions backed by Cloudflare D1, with durable consent, confirmation, unsubscribe, and delivery state.
+- Added one-click unsubscribe headers and provider-neutral queued delivery, with optional Resend delivery configured entirely through server secrets.
+- Added an authenticated, manually triggered publication sender with duplicate-delivery protection and a bounded batch size.
+- Added permanent update index and detail pages so product, methodology, and data-trust briefs can be linked, revisited, and cited.
+- Expanded the privacy notice and operational documentation for subscriber data, delivery configuration, deletion, and failure handling.
+- Preserved manual-only provider price collection: subscriptions and email delivery never trigger source fetching.
+
+## v2.0.1 — Security and maintenance release
+
+- Updated React, the React Server Components runtime, Vinext, Vite, Cloudflare tooling, Tailwind, and related build dependencies to patched compatible versions.
+- Kept ESLint on the supported v9 line and TypeScript on v5 to avoid incompatible grouped major upgrades.
+- Upgraded GitHub Actions to the current Node 24 based action releases.
+- Split weekly dependency updates into production, Cloudflare, lint, TypeScript, and GitHub Actions groups so failures stay isolated and reviewable.
+- Preserved the product contract and data model; this release changes maintenance infrastructure rather than user-facing pricing behavior.
+
 ## v2.0.0 — Complete product launch
 
 - Added a guided four-step onboarding journey and homepage calls to action that deep-link into recommendations, workspace governance, prices, and the cost calculator.

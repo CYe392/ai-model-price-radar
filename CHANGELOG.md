@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.9.0 — Security and operational readiness
+
+- Added route-aware CSP, HSTS, content-type, referrer, permissions, framing, and cross-origin resource policies while preserving the public `/embed` contract.
+- Added a unique `x-request-id`, Server-Timing, privacy-safe structured request logs, and generic failure responses at the Worker boundary.
+- Added strict query allowlists, length/repetition limits, numeric bounds, and shared region/compliance validation across public APIs.
+- Added `/api/v1/status` and `/status` for machine-readable and human-readable application, catalog, D1, source, and manual-collection readiness.
+- Added dedicated error and 404 recovery pages, a production operations/rollback runbook, and a private vulnerability-reporting policy.
+
 ## v1.8.0 — Personalization and accessibility
 
 - Added a browser-local preference center for English or Chinese core UI, system/light/dark themes, comfortable/compact density, reduced motion, and high contrast.

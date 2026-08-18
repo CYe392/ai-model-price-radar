@@ -2010,6 +2010,7 @@ export default function Home() {
       <footer className="wrap">
         <span>{copy.footerTitle}</span>
         <span>{copy.footerNote}</span>
+        <a className="footerLink" href="/status">{preferences.language === "zh" ? "服务状态 ↗" : "Service status ↗"}</a>
       </footer>
       {toast && (
         <div className="toast" role="status" aria-live="assertive">

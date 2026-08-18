@@ -69,6 +69,16 @@ export const PUBLIC_CATALOG: PublicRoute[] = [
 export const REGION_CODES = ["US", "CA", "EU", "UK", "CN", "HK", "SG", "JP", "AU"] as const;
 export const COMPLIANCE_KEYS = ["gdpr", "zdr_option", "published_sla", "no_api_training", "regional_processing"] as const;
 
+export function validateCatalogFilters(params: URLSearchParams) {
+  const region = params.get("region")?.toUpperCase();
+  const compliance = params.get("compliance");
+  if (region && !REGION_CODES.includes(region as (typeof REGION_CODES)[number]))
+    return `region must be one of: ${REGION_CODES.join(", ")}`;
+  if (compliance && !COMPLIANCE_KEYS.includes(compliance as (typeof COMPLIANCE_KEYS)[number]))
+    return `compliance must be one of: ${COMPLIANCE_KEYS.join(", ")}`;
+  return null;
+}
+
 export function filterCatalog(params: URLSearchParams) {
   const model = params.get("model")?.toLowerCase();
   const provider = params.get("provider")?.toLowerCase();

@@ -1,6 +1,6 @@
 import { PUBLIC_CATALOG } from "./public-catalog";
 
-export const PRODUCT_VERSION = "2.6.0";
+export const PRODUCT_VERSION = "2.7.0";
 
 export async function getServiceStatus() {
   let database: "operational" | "unavailable" = "operational";

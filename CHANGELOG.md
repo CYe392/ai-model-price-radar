@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.7.0 — Email delivery reliability and retention
+
+- Added cryptographic verification of raw Resend webhook requests with timestamp replay protection.
+- Persisted provider delivery state and deduplicated Resend's at-least-once webhook events by their unique event ID.
+- Made delivery updates order-aware and automatically suppressed future sends after bounce, spam complaint, or provider suppression events.
+- Added administrator-authorized, bounded manual retry for failed or delayed publication deliveries with a three-attempt ceiling.
+- Added administrator-authorized retention cleanup for expired pending, unsubscribed, suppressed, and webhook event records without introducing a background scheduler.
+- Documented webhook registration, retry, retention, required secrets, and the subscriber-data boundary.
+
 ## v2.6.0 — Subscription privacy and self-service
 
 - Added a private, token-based subscription preference center without introducing accounts or an identity provider.

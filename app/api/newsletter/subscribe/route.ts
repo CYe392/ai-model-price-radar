@@ -125,7 +125,7 @@ export async function POST(request: Request) {
       deliveryState = "sent";
       await db
         .prepare(
-          "UPDATE newsletter_deliveries SET status = 'sent', provider_message_id = ?, sent_at = ? WHERE id = ?",
+          "UPDATE newsletter_deliveries SET status = 'sent', provider_message_id = ?, sent_at = ?, attempt_count = attempt_count + 1 WHERE id = ?",
         )
         .bind(sent.providerMessageId, new Date().toISOString(), delivery?.id)
         .run();
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
     deliveryState = "retry_pending";
     await db
       .prepare(
-        "UPDATE newsletter_deliveries SET status = 'failed', error = ? WHERE id = ?",
+        "UPDATE newsletter_deliveries SET status = 'failed', error = ?, attempt_count = attempt_count + 1 WHERE id = ?",
       )
       .bind(error instanceof Error ? error.message.slice(0, 240) : "delivery failed", delivery?.id)
       .run();

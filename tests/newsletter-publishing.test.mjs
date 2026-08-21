@@ -3,15 +3,19 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [schema, migration, subscribe, confirm, unsubscribe, preferences, summary, send, form, manager, updates, privacy, operations] = await Promise.all([
+const [schema, migration, reliabilityMigration, subscribe, confirm, unsubscribe, preferences, summary, send, webhook, retry, maintenance, form, manager, updates, privacy, operations] = await Promise.all([
   read("../db/schema.ts"),
   read("../drizzle/0004_newsletter.sql"),
+  read("../drizzle/0007_newsletter_reliability.sql"),
   read("../app/api/newsletter/subscribe/route.ts"),
   read("../app/api/newsletter/confirm/route.ts"),
   read("../app/api/newsletter/unsubscribe/route.ts"),
   read("../app/api/newsletter/preferences/route.ts"),
   read("../app/api/newsletter/summary/route.ts"),
   read("../app/api/newsletter/send/route.ts"),
+  read("../app/api/newsletter/webhook/route.ts"),
+  read("../app/api/newsletter/retry/route.ts"),
+  read("../app/api/newsletter/maintenance/route.ts"),
   read("../app/updates/newsletter-form.tsx"),
   read("../app/subscription/subscription-manager.tsx"),
   read("../lib/updates.ts"),
@@ -61,6 +65,27 @@ test("keeps newsletter operations aggregate-only", () => {
   assert.match(summary, /GROUP BY status, region, locale/);
   assert.match(summary, /aggregate-only; no email addresses or subscriber tokens/);
   assert.doesNotMatch(summary, /SELECT email|unsubscribe_token/);
+});
+
+test("tracks verified delivery events without duplicate processing", () => {
+  assert.match(schema, /newsletterWebhookEvents/);
+  assert.match(schema, /attemptCount/);
+  assert.match(reliabilityMigration, /newsletter_webhook_events/);
+  assert.match(reliabilityMigration, /uq_newsletter_deliveries_provider_message/);
+  assert.match(webhook, /verifyResendWebhook/);
+  assert.match(webhook, /INSERT OR IGNORE INTO newsletter_webhook_events/);
+  assert.match(webhook, /last_event_at IS NULL OR last_event_at <=/);
+  assert.match(webhook, /status = 'suppressed'/);
+});
+
+test("bounds retries and applies explicit retention windows", () => {
+  assert.match(retry, /LIMIT 10/);
+  assert.match(retry, /attempt_count < 3/);
+  assert.match(retry, /s\.status = 'active'/);
+  assert.match(maintenance, /30 \* 86400_000/);
+  assert.match(maintenance, /90 \* 86400_000/);
+  assert.match(maintenance, /NEWSLETTER_ADMIN_TOKEN/);
+  assert.match(operations, /No scheduled cleanup job is installed/);
 });
 
 test("publishes durable update pages and an accurate privacy notice", () => {

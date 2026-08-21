@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.6.0 — Subscription privacy and self-service
+
+- Added a private, token-based subscription preference center without introducing accounts or an identity provider.
+- Kept preference tokens in URL fragments, removed them from the address bar after page load, and sent them only in no-store POST bodies.
+- Let subscribers update market and language, unsubscribe, or permanently delete their D1 subscriber record and cascading delivery history.
+- Returned only a masked email address to the preference UI and marked the management page noindex.
+- Added an administrator-authorized aggregate subscription and delivery report that never returns emails, tokens, or subscriber-level rows.
+- Updated every confirmation and publication email with preference and deletion controls, plus privacy and operations documentation.
+
 ## v2.5.0 — Manual refresh reliability
 
 - Split cached public reads from provider collection: `GET /api/prices` can no longer fetch or write provider data.

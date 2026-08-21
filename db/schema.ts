@@ -149,3 +149,11 @@ export const analyticsDaily = sqliteTable(
     index("idx_analytics_daily_day_event").on(table.day, table.event),
   ],
 );
+
+export const refreshLease = sqliteTable("refresh_lease", {
+  id: text("id").primaryKey(),
+  startedAt: text("started_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  completedAt: text("completed_at"),
+  status: text("status").notNull().default("running"),
+});

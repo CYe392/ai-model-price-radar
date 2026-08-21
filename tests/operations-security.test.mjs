@@ -3,13 +3,15 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [workerSource, apiSource, compareSource, recommendSource, statusSource, statusPage, errorPage, notFound, operations, security] = await Promise.all([
+const [workerSource, apiSource, compareSource, recommendSource, statusSource, serviceStatus, statusPage, appLink, errorPage, notFound, operations, security] = await Promise.all([
   read("../worker/index.ts"),
   read("../lib/public-api.ts"),
   read("../app/api/v1/compare/route.ts"),
   read("../app/api/v1/recommend/route.ts"),
   read("../app/api/v1/status/route.ts"),
+  read("../lib/service-status.ts"),
   read("../app/status/page.tsx"),
+  read("../app/app-link.tsx"),
   read("../app/error.tsx"),
   read("../app/not-found.tsx"),
   read("../docs/OPERATIONS.md"),
@@ -47,12 +49,25 @@ test("bounds and validates every public query parameter", async () => {
   assert.equal(payload.error.code, "invalid_cache_hit");
 });
 
-test("publishes readiness and human recovery surfaces", () => {
+test("publishes readiness and human recovery surfaces", async () => {
   assert.match(statusSource, /getServiceStatus/);
+  assert.match(serviceStatus, /getNewsletterRuntimeReadiness/);
   assert.match(statusPage, /All core systems operational/);
   assert.match(statusPage, /Manual refresh by design/);
+  assert.match(statusPage, /configured/);
   assert.match(errorPage, /Try again/);
   assert.match(notFound, /PAGE NOT FOUND/);
+  const response = await request("/api/v1/status");
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.data.components.email_delivery.status, "awaiting_configuration");
+  assert.equal(payload.data.components.email_delivery.configured, 0);
+  assert.equal(payload.data.components.email_delivery.required, 4);
+});
+
+test("keeps navigation stable while framework prefetch is disabled", () => {
+  assert.match(appLink, /prefetch=\{false\}/);
+  assert.match(appLink, /<NextLink/);
 });
 
 test("keeps structured logs free of queries and documents incident response", () => {

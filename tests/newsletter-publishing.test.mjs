@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { getNewsletterRuntimeReadiness } from "../lib/newsletter-readiness.ts";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [schema, migration, reliabilityMigration, subscribe, confirm, unsubscribe, preferences, summary, send, webhook, retry, maintenance, form, manager, updates, privacy, operations] = await Promise.all([
+const [schema, migration, reliabilityMigration, subscribe, confirm, unsubscribe, preferences, summary, send, webhook, retry, maintenance, status, form, manager, updates, privacy, operations] = await Promise.all([
   read("../db/schema.ts"),
   read("../drizzle/0004_newsletter.sql"),
   read("../drizzle/0007_newsletter_reliability.sql"),
@@ -16,6 +17,7 @@ const [schema, migration, reliabilityMigration, subscribe, confirm, unsubscribe,
   read("../app/api/newsletter/webhook/route.ts"),
   read("../app/api/newsletter/retry/route.ts"),
   read("../app/api/newsletter/maintenance/route.ts"),
+  read("../lib/service-status.ts"),
   read("../app/updates/newsletter-form.tsx"),
   read("../app/subscription/subscription-manager.tsx"),
   read("../lib/updates.ts"),
@@ -86,6 +88,25 @@ test("bounds retries and applies explicit retention windows", () => {
   assert.match(maintenance, /90 \* 86400_000/);
   assert.match(maintenance, /NEWSLETTER_ADMIN_TOKEN/);
   assert.match(operations, /No scheduled cleanup job is installed/);
+});
+
+test("reports runtime readiness without exposing secret values", () => {
+  const absent = getNewsletterRuntimeReadiness();
+  assert.equal(absent.status, "awaiting_configuration");
+  assert.equal(absent.configured, 0);
+  const ready = getNewsletterRuntimeReadiness({
+    RESEND_API_KEY: "configured",
+    NEWSLETTER_FROM: "configured",
+    RESEND_WEBHOOK_SECRET: "configured",
+    NEWSLETTER_ADMIN_TOKEN: "configured",
+  });
+  assert.equal(ready.status, "operational");
+  assert.equal(ready.configured, 4);
+  assert.equal(ready.delivery_ready, true);
+  assert.equal(ready.webhook_ready, true);
+  assert.equal(ready.operations_ready, true);
+  assert.match(status, /email_delivery: emailDelivery/);
+  assert.doesNotMatch(status, /RESEND_API_KEY|NEWSLETTER_ADMIN_TOKEN/);
 });
 
 test("publishes durable update pages and an accurate privacy notice", () => {

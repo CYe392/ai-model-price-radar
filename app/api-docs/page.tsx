@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/app/app-link";
 import { SITE_URL } from "../../lib/site";
 
 const base = SITE_URL;

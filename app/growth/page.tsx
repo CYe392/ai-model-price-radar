@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/app/app-link";
 import { ProductShell } from "../product-shell";
 
 export const metadata: Metadata = { title: "Growth and measurement methodology", description: "How ModelScope measures useful discovery without user profiles and keeps indexing actions manual.", alternates: { canonical: "/growth" } };

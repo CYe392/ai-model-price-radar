@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/app/app-link";
 import { JsonLd } from "../json-ld";
 import { ProductShell } from "../product-shell";
 import { absoluteUrl } from "../../lib/site";

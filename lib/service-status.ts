@@ -1,6 +1,7 @@
 import { PUBLIC_CATALOG } from "./public-catalog";
+import { getNewsletterRuntimeReadiness } from "./newsletter-readiness";
 
-export const PRODUCT_VERSION = "2.7.0";
+export const PRODUCT_VERSION = "2.8.0";
 
 export async function getServiceStatus() {
   let database: "operational" | "unavailable" = "operational";
@@ -31,6 +32,15 @@ export async function getServiceStatus() {
     ? "awaiting_manual_refresh"
     : degradedSources.length > 0 ? "degraded" : "operational";
   const status = database === "operational" && sourceState !== "degraded" ? "operational" : "degraded";
+  let emailDelivery = getNewsletterRuntimeReadiness();
+  try {
+    const { env } = await import("cloudflare:workers");
+    emailDelivery = getNewsletterRuntimeReadiness(
+      env as unknown as Record<string, string | undefined>,
+    );
+  } catch {
+    // Optional delivery remains visibly unconfigured outside the Worker runtime.
+  }
   return {
     status,
     version: PRODUCT_VERSION,
@@ -40,6 +50,7 @@ export async function getServiceStatus() {
       public_catalog: { status: "operational", routes: PUBLIC_CATALOG.length },
       database: { status: database },
       provider_sources: { status: sourceState, checked: latestSources.length, degraded: degradedSources.length },
+      email_delivery: emailDelivery,
     },
     manual_collection: {
       scheduled_refresh: false,

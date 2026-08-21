@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -9,7 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "test": "npm run build && node --experimental-strip-types --test tests/*.test.mjs",
     "smoke": "npm run build && node scripts/smoke.mjs",
     "lint": "eslint app db tests --ignore-pattern dist --ignore-pattern .next --ignore-pattern .wrangler",
     "db:check": "node scripts/check-migrations.mjs",

@@ -116,6 +116,8 @@ export const newsletterDeliveries = sqliteTable(
     status: text("status").notNull().default("pending"),
     providerMessageId: text("provider_message_id"),
     error: text("error"),
+    lastEventAt: text("last_event_at"),
+    attemptCount: integer("attempt_count").notNull().default(0),
     createdAt: text("created_at").notNull(),
     sentAt: text("sent_at"),
   },
@@ -125,6 +127,23 @@ export const newsletterDeliveries = sqliteTable(
       table.createdAt,
     ),
     index("idx_newsletter_deliveries_subscriber").on(table.subscriberId),
+  ],
+);
+
+export const newsletterWebhookEvents = sqliteTable(
+  "newsletter_webhook_events",
+  {
+    eventId: text("event_id").primaryKey(),
+    providerMessageId: text("provider_message_id"),
+    eventType: text("event_type").notNull(),
+    eventCreatedAt: text("event_created_at").notNull(),
+    processedAt: text("processed_at").notNull(),
+  },
+  (table) => [
+    index("idx_newsletter_webhook_message_time").on(
+      table.providerMessageId,
+      table.eventCreatedAt,
+    ),
   ],
 );
 

@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       sent += 1;
       await db
         .prepare(
-          "UPDATE newsletter_deliveries SET status = 'sent', provider_message_id = ?, sent_at = ? WHERE id = ?",
+          "UPDATE newsletter_deliveries SET status = 'sent', provider_message_id = ?, sent_at = ?, attempt_count = attempt_count + 1 WHERE id = ?",
         )
         .bind(result.providerMessageId, new Date().toISOString(), delivery?.id)
         .run();
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       failed += 1;
       await db
         .prepare(
-          "UPDATE newsletter_deliveries SET status = 'failed', error = ? WHERE id = ?",
+          "UPDATE newsletter_deliveries SET status = 'failed', error = ?, attempt_count = attempt_count + 1 WHERE id = ?",
         )
         .bind(error instanceof Error ? error.message.slice(0, 240) : "delivery failed", delivery?.id)
         .run();

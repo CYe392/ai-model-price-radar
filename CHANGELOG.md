@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.8.1 — Toolchain maintenance
+
+- Updated the ESLint configuration package from 9.39.4 to 9.39.5 and the runtime globals catalog from 16.4.0 to 17.11.0.
+- Updated the Node.js, React, and React DOM TypeScript definitions to their latest compatible Node 22 and React 19 releases.
+- Revalidated the complete production build, migration chain, lint rules, and product regression suite without changing user-facing behavior.
+
 ## v2.8.0 — Runtime readiness and navigation stability
 
 - Added a public, secret-free email delivery readiness summary to the service status API and human status page.

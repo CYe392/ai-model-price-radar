@@ -5,6 +5,8 @@ import "./commercial.css";
 import "./commercial-options.css";
 import "./discovery.css";
 import "./guide.css";
+import "./subscription.css";
+import "./newsletter-manage.css";
 import { ConsentManager } from "./consent-manager";
 import { JsonLd } from "./json-ld";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "../lib/site";

@@ -59,13 +59,14 @@ export async function POST(request: Request) {
       .first<{ id: number }>();
     const updateUrl = `${origin}/updates/${encodeURIComponent(update.slug)}`;
     const unsubscribeUrl = `${origin}/api/newsletter/unsubscribe?token=${encodeURIComponent(subscriber.unsubscribe_token)}`;
+    const manageUrl = `${origin}/subscription#token=${encodeURIComponent(subscriber.unsubscribe_token)}`;
 
     try {
       const result = await sendNewsletterEmail({
         to: subscriber.email,
         subject: update.title,
         unsubscribeUrl,
-        html: `<p>${escapeHtml(update.summary)}</p><p><a href="${escapeHtml(updateUrl)}">Read the full update</a></p><p><a href="${escapeHtml(unsubscribeUrl)}">Unsubscribe</a></p>`,
+        html: `<p>${escapeHtml(update.summary)}</p><p><a href="${escapeHtml(updateUrl)}">Read the full update</a></p><p><a href="${escapeHtml(manageUrl)}">Manage preferences or delete my data</a> · <a href="${escapeHtml(unsubscribeUrl)}">Unsubscribe</a></p>`,
       });
       if (!result.configured) {
         queued += 1;

@@ -25,4 +25,10 @@ The endpoint processes at most 25 active subscribers per request and skips an al
 
 ## Data handling
 
-Subscriber deletion and access requests must be handled by the site operator. Unsubscribing sets the durable status to `unsubscribed`; it does not silently resubscribe or require an account. Review failed and pending rows in `newsletter_deliveries` before retrying a publication.
+Every delivered message includes a private `/subscription#token=...` link. The fragment is not sent in the initial HTTP request and the client removes it from the address bar before reading preferences. A valid token can update market/language, unsubscribe, or permanently delete the subscriber row; delivery rows are removed by the existing cascade.
+
+Unsubscribing sets the durable status to `unsubscribed`; it does not silently resubscribe or require an account. Permanent deletion is a separate explicit action with a browser confirmation. Review failed and pending rows in `newsletter_deliveries` before retrying a publication.
+
+## Aggregate operations
+
+`GET /api/newsletter/summary` requires the same `NEWSLETTER_ADMIN_TOKEN`. It returns counts grouped by subscription status, market, language, delivery kind, and delivery status. It never returns email addresses, tokens, or subscriber-level rows.

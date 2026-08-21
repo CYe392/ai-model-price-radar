@@ -111,6 +111,7 @@ export async function POST(request: Request) {
   const origin = new URL(request.url).origin;
   const confirmUrl = `${origin}/api/newsletter/confirm?token=${encodeURIComponent(confirmationToken)}`;
   const unsubscribeUrl = `${origin}/api/newsletter/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`;
+  const manageUrl = `${origin}/subscription#token=${encodeURIComponent(unsubscribeToken)}`;
   let deliveryState = "queued";
 
   try {
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
       to: email,
       subject: "Confirm your ModelScope updates",
       unsubscribeUrl,
-      html: `<p>Confirm your ModelScope email updates subscription.</p><p><a href="${escapeHtml(confirmUrl)}">Confirm subscription</a></p><p>If you did not request this, you can ignore this message.</p>`,
+      html: `<p>Confirm your ModelScope email updates subscription.</p><p><a href="${escapeHtml(confirmUrl)}">Confirm subscription</a></p><p><a href="${escapeHtml(manageUrl)}">Manage or delete this subscription</a></p><p>If you did not request this, you can ignore this message.</p>`,
     });
     if (sent.configured) {
       deliveryState = "sent";

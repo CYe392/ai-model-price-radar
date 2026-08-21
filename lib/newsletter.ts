@@ -21,6 +21,12 @@ export function isNewsletterRegion(value: string) {
   );
 }
 
+export function maskEmail(value: string) {
+  const [local = "", domain = ""] = value.split("@");
+  if (!local || !domain) return "hidden address";
+  return `${local.slice(0, 1)}***@${domain}`;
+}
+
 export function createToken() {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return btoa(String.fromCharCode(...bytes))

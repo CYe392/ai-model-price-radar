@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/app/app-link";
 import { ProductShell } from "../product-shell";
 
 export default function StartPage() {

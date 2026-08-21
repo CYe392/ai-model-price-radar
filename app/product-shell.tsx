@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/app/app-link";
 import type { ReactNode } from "react";
 
 export function ProductShell({ eyebrow, title, lede, children }: { eyebrow: string; title: string; lede: string; children: ReactNode }) {

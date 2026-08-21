@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/app/app-link";
 import { useConsentSettings } from "./consent-manager";
 
 export function AdSlot({ placement }: { placement: string }) {

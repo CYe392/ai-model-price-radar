@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/app/app-link";
 import type { CatalogGroup } from "../lib/discovery";
 import { money, slugify } from "../lib/discovery";
 

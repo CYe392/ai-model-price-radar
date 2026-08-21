@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/app/app-link";
 import { ProductShell } from "../product-shell";
 import { PRODUCT_UPDATES } from "../../lib/updates";
 import { NewsletterForm } from "./newsletter-form";

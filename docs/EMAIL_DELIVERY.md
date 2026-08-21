@@ -11,6 +11,10 @@ ModelScope keeps subscription state in D1 and uses double opt-in. No email addre
 
 If delivery secrets are absent, subscriptions and delivery records remain queued in D1. The API never exposes a confirmation token as a substitute for real email delivery.
 
+## Verify runtime readiness
+
+Open `/status` or request `GET /api/v1/status`. The `email_delivery` component reports only configuration counts and readiness booleans for delivery, webhook verification, and administrator operations. It never returns an environment variable value. Email delivery is optional, so missing email configuration does not mark the core price-intelligence service as degraded.
+
 ## Publish an update
 
 Update content is versioned in `lib/updates.ts`. After deploying a release, an operator can send one bounded batch with:

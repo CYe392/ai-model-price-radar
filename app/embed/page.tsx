@@ -1,5 +1,5 @@
 import { PUBLIC_CATALOG } from "../../lib/public-catalog";
-import Link from "next/link";
+import Link from "@/app/app-link";
 
 export default function EmbedPage() {
   const routes = [...PUBLIC_CATALOG]

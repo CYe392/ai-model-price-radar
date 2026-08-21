@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/app/app-link";
 import { notFound } from "next/navigation";
 import { ProductShell } from "../../product-shell";
 import { JsonLd } from "../../json-ld";

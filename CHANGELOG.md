@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.8.0 — Runtime readiness and navigation stability
+
+- Added a public, secret-free email delivery readiness summary to the service status API and human status page.
+- Distinguished delivery credentials, webhook verification, and administrator operations so deployment gaps can be identified without exposing runtime values.
+- Kept optional email configuration from degrading the core price intelligence service while clearly showing when delivery is awaiting setup.
+- Disabled speculative internal-link prefetch through one shared link component to avoid a non-blocking vinext beta prefetch failure without changing ordinary navigation.
+- Added release coverage for readiness reporting and the navigation fallback.
+
 ## v2.7.0 — Email delivery reliability and retention
 
 - Added cryptographic verification of raw Resend webhook requests with timestamp replay protection.

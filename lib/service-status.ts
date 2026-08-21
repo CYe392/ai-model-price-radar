@@ -1,7 +1,7 @@
 import { PUBLIC_CATALOG } from "./public-catalog";
 import { getNewsletterRuntimeReadiness } from "./newsletter-readiness";
 
-export const PRODUCT_VERSION = "2.8.0";
+export const PRODUCT_VERSION = "2.8.1";
 
 export async function getServiceStatus() {
   let database: "operational" | "unavailable" = "operational";

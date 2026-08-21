@@ -1266,7 +1266,11 @@ export default function Home() {
     setBusy(true);
     setFetchError("");
     try {
-      const response = await fetch("/api/prices", { cache: "no-store" });
+      const response = await fetch("/api/prices", {
+        method: "POST",
+        cache: "no-store",
+        headers: { "x-modelscope-action": "manual-price-refresh" },
+      });
       if (!response.ok) throw new Error(`Server returned ${response.status}`);
       const data = (await response.json()) as {
         collectedAt: string;

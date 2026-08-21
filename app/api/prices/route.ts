@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 import { and, desc, eq } from "drizzle-orm";
-import { getDb } from "../../../db";
 import {
   collectionRuns,
   priceSnapshots,
@@ -76,6 +75,60 @@ const TARGETS = [
 ];
 
 const PARSER_VERSION = "2026.08-v1.1";
+const REFRESH_LEASE_SECONDS = 90;
+const REFRESH_COOLDOWN_SECONDS = 30;
+
+async function database() {
+  const { getDb } = await import("../../../db");
+  return getDb();
+}
+
+async function d1Binding() {
+  const { getD1Binding } = await import("../../../db");
+  return getD1Binding();
+}
+
+function isManualSameOriginRequest(request: Request) {
+  if (request.headers.get("x-modelscope-action") !== "manual-price-refresh")
+    return false;
+  const requestUrl = new URL(request.url);
+  const origin = request.headers.get("origin");
+  if (origin && origin !== requestUrl.origin) return false;
+  const fetchSite = request.headers.get("sec-fetch-site");
+  return !fetchSite || fetchSite === "same-origin" || fetchSite === "same-site";
+}
+
+async function acquireRefreshLease() {
+  const binding = await d1Binding();
+  const now = Date.now();
+  const startedAt = new Date(now).toISOString();
+  const result = await binding
+    .prepare(
+      `INSERT INTO refresh_lease (id, started_at, expires_at, completed_at, status)
+       VALUES ('global', ?, ?, NULL, 'running')
+       ON CONFLICT(id) DO UPDATE SET
+         started_at = excluded.started_at,
+         expires_at = excluded.expires_at,
+         completed_at = NULL,
+         status = 'running'
+       WHERE refresh_lease.expires_at <= ?`,
+    )
+    .bind(startedAt, now + REFRESH_LEASE_SECONDS * 1000, now)
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+async function finishRefreshLease(status: "completed" | "failed") {
+  const now = Date.now();
+  const cooldown = status === "completed" ? REFRESH_COOLDOWN_SECONDS : 10;
+  const binding = await d1Binding();
+  await binding
+    .prepare(
+      "UPDATE refresh_lease SET completed_at = ?, expires_at = ?, status = ? WHERE id = 'global'",
+    )
+    .bind(new Date(now).toISOString(), now + cooldown * 1000, status)
+    .run();
+}
 
 function dollars(value: unknown) {
   const n = Number(value);
@@ -772,7 +825,7 @@ async function persist(
   sources: SourceStatus[],
   collectedAt: string,
 ) {
-  const db = getDb();
+  const db = await database();
   const accepted: PriceUpdate[] = [];
   const changes: PriceChange[] = [];
   let rejected = 0;
@@ -883,7 +936,7 @@ async function persist(
 }
 
 async function retainedPrices(exclude: Set<string>): Promise<PriceUpdate[]> {
-  const db = getDb();
+  const db = await database();
   const rows = await db
     .select()
     .from(priceSnapshots)
@@ -924,6 +977,47 @@ async function retainedPrices(exclude: Set<string>): Promise<PriceUpdate[]> {
 }
 
 export async function GET() {
+  return Response.json(
+    {
+      error: "Price collection is manual-only. Use the Refresh prices button.",
+      read_endpoints: ["/api/v1/catalog", "/api/v1/compare", "/api/v1/status"],
+    },
+    {
+      status: 405,
+      headers: { allow: "POST", "cache-control": "no-store" },
+    },
+  );
+}
+
+export async function POST(request: Request) {
+  if (!isManualSameOriginRequest(request))
+    return Response.json(
+      { error: "A same-origin manual refresh action is required." },
+      { status: 403, headers: { "cache-control": "no-store" } },
+    );
+
+  let acquired = false;
+  try {
+    acquired = await acquireRefreshLease();
+  } catch {
+    return Response.json(
+      { error: "Refresh coordination is temporarily unavailable." },
+      { status: 503, headers: { "cache-control": "no-store" } },
+    );
+  }
+  if (!acquired)
+    return Response.json(
+      { error: "A refresh is already running or has just completed." },
+      {
+        status: 429,
+        headers: {
+          "cache-control": "no-store",
+          "retry-after": String(REFRESH_COOLDOWN_SECONDS),
+        },
+      },
+    );
+
+  try {
   const adapters = await Promise.allSettled([
     jsonCatalog(
       "openrouter",
@@ -1041,7 +1135,8 @@ export async function GET() {
     persistence =
       error instanceof Error ? error.message : "snapshot storage failed";
   }
-  return Response.json(
+    await finishRefreshLease("completed");
+    return Response.json(
     {
       collectedAt,
       sources: results.map((r) => r.source),
@@ -1053,5 +1148,13 @@ export async function GET() {
         "public-pages-only; no authentication; no anti-bot bypass; >50% route changes quarantined",
     },
     { headers: { "cache-control": "no-store" } },
-  );
+    );
+  } catch (error) {
+    await finishRefreshLease("failed").catch(() => undefined);
+    console.error("Manual price refresh failed", error);
+    return Response.json(
+      { error: "The manual refresh could not be completed." },
+      { status: 500, headers: { "cache-control": "no-store" } },
+    );
+  }
 }

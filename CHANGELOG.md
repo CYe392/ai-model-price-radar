@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.5.0 — Manual refresh reliability
+
+- Split cached public reads from provider collection: `GET /api/prices` can no longer fetch or write provider data.
+- Restricted collection to an explicit same-origin `POST` initiated by the Refresh prices button.
+- Added a D1-backed global refresh lease so repeated clicks and concurrent visitors cannot start overlapping provider collections.
+- Added a short post-refresh cooldown, bounded retry guidance, and failure-safe lease release.
+- Added regression coverage for the non-mutating GET contract, manual action header, D1 migration, and refresh coordination.
+
 ## v2.4.0 — Privacy-first growth operations
 
 - Added consent-gated, first-party analytics that stores only daily counts by event, canonical path, and coarse source category.

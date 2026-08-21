@@ -47,7 +47,15 @@ test("keeps refresh manual and public-source only", async () => {
     readFile(new URL("../app/api/prices/route.ts", import.meta.url), "utf8"),
   ]);
   assert.match(page, /onClick=\{refresh\}/);
+  assert.match(page, /method:\s*"POST"/);
+  assert.match(page, /x-modelscope-action/);
   assert.doesNotMatch(page, /setInterval|setTimeout\(refresh/);
+  assert.match(route, /export async function GET\(\)/);
+  assert.match(route, /status:\s*405/);
+  assert.match(route, /export async function POST\(request: Request\)/);
+  assert.match(route, /isManualSameOriginRequest/);
+  assert.match(route, /acquireRefreshLease/);
+  assert.match(route, /retry-after/);
   assert.match(
     route,
     /public-pages-only; no authentication; no anti-bot bypass/,
